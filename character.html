@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>3D Social - Character Editor</title>
+  <link rel="stylesheet" href="/src/styles/main.css" />
+  <style>
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      font-family: sans-serif;
+      background-color: #101010;
+    }
+    canvas {
+      display: block;
+      position: absolute;
+      top: 0;
+      left: 0;
+      z-index: 0;
+    }
+    .character-creation {
+      position: absolute;
+      top: 60px;
+      left: 139px;
+      z-index: 10;
+      background: rgba(255, 255, 255, 0.95);
+      padding: 1rem;
+      border-radius: 8px;
+      border: 2px solid lightgreen;
+      width: 300px;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    }
+    .character-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .part-selector {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+    .character-controls button {
+      margin: 5px;
+      padding: 8px 12px;
+      cursor: pointer;
+      border: none;
+      border-radius: 4px;
+      background-color: #d4ffd4;
+      color: #004d00;
+      font-weight: bold;
+      transition: all 0.2s ease;
+    }
+    .character-controls button:hover {
+      background-color: #b3ffb3;
+      transform: translateY(-2px);
+    }
+    .character-controls button.active {
+      background-color: #00cc00;
+      color: white;
+    }
+    .variation-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    .variation-buttons {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 0.5rem;
+    }
+    .variation-button {
+      aspect-ratio: 1;
+      padding: 0;
+      background: #f0f0f0;
+      border: 2px solid #ddd;
+    }
+    .variation-button:hover {
+      border-color: #00cc00;
+    }
+    .variation-button.active {
+      border-color: #00cc00;
+      background: #d4ffd4;
+    }
+    .color-picker {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .color-picker label {
+      color: #004d00;
+      font-weight: bold;
+    }
+    .color-picker input[type="color"] {
+      width: 100%;
+      height: 40px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    .accept-button {
+      background-color: #00cc00 !important;
+      color: white !important;
+      margin-top: 1rem !important;
+      cursor: pointer;
+      border-radius: 4px;
+      padding: 10px;
+      transition: all 0.2s ease;
+    }
+    .accept-button:hover {
+      background-color: #00b300 !important;
+      transform: translateY(-2px);
+    }
+    .menu {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      width: 120px;
+      height: auto;
+      background-color: rgba(0, 0, 0, 0.7);
+      z-index: 3;
+      border-radius: 10px;
+      padding: 10px;
+    }
+    .menu-item {
+      display: block;
+      color: #fff;
+      text-decoration: none;
+      margin: 5px 0;
+      padding: 8px 12px;
+      border-radius: 5px;
+      transition: background-color 0.3s;
+      text-align: center;
+      font-size: 14px;
+    }
+    .menu-item:hover {
+      background-color: rgba(255, 255, 255, 0.2);
+    }
+    .menu-item.active {
+      background-color: rgba(255, 255, 255, 0.3);
+      font-weight: bold;
+    }
+    .part-title {
+      color: #004d00;
+      font-weight: bold;
+      text-align: center;
+      margin-bottom: 0.5rem;
+    }
+  </style>
+</head>
+<body>
+  <nav class="menu">
+    <a href="index.html" class="menu-item" data-page="home">Home</a>
+    <a href="character.html" class="menu-item active" data-page="character">Character</a>
+    <a href="messages.html" class="menu-item" data-page="messages">Messages</a>
+    <a href="notifications.html" class="menu-item" data-page="notifications">Notifications</a>
+    <a href="#" class="menu-item logout-button" id="logout-button">Logout</a>
+  </nav>
+
+  <div class="character-creation">
+    <div class="character-controls">
+      <div class="part-selector">
+        <button class="part-button active" data-part="head">Head</button>
+        <button class="part-button" data-part="teeth">Teeth</button>
+        <button class="part-button" data-part="shirt">Shirt</button>
+        <button class="part-button" data-part="belt">Belt</button>
+        <button class="part-button" data-part="pants">Pants</button>
+        <button class="part-button" data-part="shoes">Shoes</button>
+      </div>
+      <div class="variation-controls">
+        <div class="part-title">Select Variation</div>
+        <div class="variation-buttons">
+          <button class="variation-button" data-variation="0">1</button>
+          <button class="variation-button" data-variation="1">2</button>
+          <button class="variation-button" data-variation="2">3</button>
+          <button class="variation-button" data-variation="3">4</button>
+          <button class="variation-button" data-variation="4">5</button>
+        </div>
+      </div>
+      <div class="color-picker">
+        <label for="color-input">Color</label>
+        <input type="color" id="color-input" value="#4a90e2">
+      </div>
+      
+      <!-- Add bio toggle button -->
+      <button id="toggle-bio-button" style="margin-top: 20px; background-color: #4a90e2; color: white; border: none; padding: 8px 12px; border-radius: 4px; cursor: pointer;">
+        Show/Hide Bio Editor
+      </button>
+      
+      <!-- Make bio container initially hidden -->
+      <div class="bio-container" id="bio-container" style="margin-top: 20px; margin-bottom: 20px; display: none;">
+        <label for="character-bio">Your Bio (shown when users click your character)</label>
+        <textarea id="character-bio" rows="4" style="width: 100%; margin-top: 8px; padding: 8px; border-radius: 4px; resize: vertical;"></textarea>
+      </div>
+      
+      <button id="accept-character" class="accept-button">Save Changes</button>
+    </div>
+  </div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { CharacterCreator } from './src/pages/CharacterCreator.js';
+    import { makeAuthenticatedRequest } from './src/utils/api.js';
+
+    console.log('Starting character editor...');
+
+    const scene = new THREE.Scene();
+    const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 90);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    document.body.appendChild(renderer.domElement);
+
+    // Lighting
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(ambientLight, directionalLight);
+
+    // Initialize character
+    console.log('Creating character creator...');
+    const creator = new CharacterCreator(scene, camera);
+    creator.isActive = true;
+    document.addEventListener('wheel', creator.onWheel);
+
+    // Load existing character data
+    async function loadCharacter() {
+      try {
+        const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/character');
+        const userData = await response.json();
+        
+        if (userData) {
+          console.log('Response from API:', userData);
+          
+          // Character data is now nested under the 'character' property
+          if (userData.character && userData.character.variations) {
+            console.log('Found character data, loading variations:', userData.character.variations);
+            await creator.loadCharacter(userData.character);
+            console.log('Character loaded successfully');
+          } else {
+            console.log('Valid API response but no character variations found');
+            creator.createDefaultCharacter();
+          }
+          
+          // Load bio if available
+          if (userData.bio) {
+            console.log('Loading bio:', userData.bio);
+            document.getElementById('character-bio').value = userData.bio;
+          } else {
+            console.log('No bio found in user data');
+          }
+        } else {
+          console.log('No response data from API, creating default character');
+          creator.createDefaultCharacter();
+        }
+      } catch (error) {
+        console.error('Error loading character:', error);
+        // Fallback to localStorage if database fails
+        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+        const users = JSON.parse(localStorage.getItem('users') || '{}');
+        
+        if (users[currentUser.username]?.character) {
+          console.log('Loading character from localStorage');
+          await creator.loadCharacter(users[currentUser.username].character);
+          
+          // Try to load bio from localStorage
+          if (currentUser.bio) {
+            console.log('Loading bio from localStorage:', currentUser.bio);
+            document.getElementById('character-bio').value = currentUser.bio;
+          }
+        } else {
+          console.log('No character found in localStorage, creating default character');
+          creator.createDefaultCharacter();
+        }
+      }
+    }
+
+    // Load character immediately
+    loadCharacter();
+
+    let activePart = 'head';
+
+    function updateVariationButtons() {
+      const currentVariation = creator.currentVariations[activePart];
+      document.querySelectorAll('.variation-button').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.dataset.variation) === currentVariation);
+      });
+    }
+
+    // UI Handlers
+    document.querySelectorAll('.part-button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.part-button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        activePart = btn.dataset.part;
+        console.log('Selected part:', activePart);
+        // Update color picker to match current part color
+        document.getElementById('color-input').value = '#' + creator.colors[activePart].toString(16).padStart(6, '0');
+        updateVariationButtons();
+      });
+    });
+
+    document.querySelectorAll('.variation-button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const variation = parseInt(btn.dataset.variation);
+        creator.currentVariations[activePart] = variation;
+        creator.updateCharacter();
+        updateVariationButtons();
+      });
+    });
+
+    document.getElementById('color-input').addEventListener('input', e => {
+      const color = new THREE.Color(e.target.value);
+      creator.colors[activePart] = color.getHex();
+      creator.updateCharacter();
+    });
+
+    document.getElementById('accept-character').addEventListener('click', async () => {
+      console.log('before editing after saving');
+      // Get current variations and colors from creator
+      const characterData = {
+        variations: { ...creator.currentVariations },
+        colors: { ...creator.colors },
+        bio: document.getElementById('character-bio').value
+      };
+
+      // Ensure all required parts are included
+      const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
+      for (const part of parts) {
+        if (characterData.variations[part] === undefined) {
+          characterData.variations[part] = 0;
+        }
+        if (characterData.colors[part] === undefined) {
+          // Use default colors from the creator
+          const defaultColors = {
+            head: 0xffcc99,
+            teeth: 0xffffff,
+            shirt: 0x0000ff,
+            belt: 0x000000,
+            pants: 0x000080,
+            shoes: 0x222222
+          };
+          characterData.colors[part] = defaultColors[part] || 0xcccccc;
+        }
+      }
+
+      try {
+        console.log('Saving character data:', characterData);
+        // Save to database (note: API expects direct variations/colors, not nested)
+        const response = await makeAuthenticatedRequest(
+          'http://localhost:5000/api/users/character',
+          'PUT',
+          characterData
+        );
+
+        if (response.ok) {
+          console.log('after saving got the save successful popup');
+          // Update localStorage as backup
+          const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+          
+          // Update character in currentUser - ensure we're not nesting unnecessarily
+          currentUser.character = JSON.parse(JSON.stringify(characterData)); // Deep copy
+          
+          // Also save bio at top level for backward compatibility
+          currentUser.bio = characterData.bio;
+          
+          localStorage.setItem('currentUser', JSON.stringify(currentUser));
+          
+          alert('Character saved successfully!');
+          window.location.href = 'index.html';
+        } else {
+          throw new Error('Failed to save character');
+        }
+      } catch (error) {
+        console.error('Error saving character:', error);
+        alert('Failed to save character. Please try again.');
+      }
+    });
+
+    // Initialize variation buttons
+    updateVariationButtons();
+
+    // Add bio toggle button functionality
+    document.getElementById('toggle-bio-button').addEventListener('click', () => {
+      const bioContainer = document.getElementById('bio-container');
+      if (bioContainer.style.display === 'none') {
+        bioContainer.style.display = 'block';
+        document.getElementById('toggle-bio-button').textContent = 'Hide Bio Editor';
+      } else {
+        bioContainer.style.display = 'none';
+        document.getElementById('toggle-bio-button').textContent = 'Show Bio Editor';
+      }
+    });
+
+    function animate() {
+      requestAnimationFrame(animate);
+      renderer.render(scene, camera);
+    }
+
+    animate();
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    // Setup logout button
+    const logoutButton = document.getElementById('logout-button');
+    if (logoutButton) {
+      logoutButton.addEventListener('click', (e) => {
+        e.preventDefault();
+        // Clear authentication data
+        localStorage.removeItem('token');
+        localStorage.removeItem('currentUser');
+        
+        // Redirect to home page
+        window.location.href = 'index.html';
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Messages - 3D Social</title>
+    <link rel="stylesheet" href="/src/styles/main.css">
+    <style>
+      #messages-container {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: #1a1a1a;
+        display: flex;
+        z-index: 1000;
+      }
+
+      #left-panel {
+        width: 300px;
+        border-right: 1px solid #333;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #search-container {
+        padding: 20px;
+        border-bottom: 1px solid #333;
+      }
+
+      #user-search {
+        width: 100%;
+        padding: 10px;
+        background-color: #333;
+        border: none;
+        border-radius: 5px;
+        color: white;
+        font-size: 14px;
+      }
+
+      #user-search:focus {
+        outline: none;
+        box-shadow: 0 0 0 2px #4a90e2;
+      }
+
+      #users-list {
+        flex: 1;
+        overflow-y: auto;
+        padding: 0 20px;
+      }
+
+      .chat-item {
+        padding: 10px;
+        border-bottom: 1px solid #333;
+        cursor: pointer;
+        color: white;
+      }
+
+      .chat-item:hover {
+        background-color: #333;
+      }
+
+      #right-panel {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+      }
+
+      #chat-content {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        padding: 20px;
+        overflow-y: auto;
+      }
+
+      .message {
+        margin-bottom: 10px;
+        padding: 10px;
+        border-radius: 5px;
+        max-width: 70%;
+        word-wrap: break-word;
+      }
+
+      .message.sent {
+        background-color: #4a90e2;
+        margin-left: auto;
+      }
+
+      .message.received {
+        background-color: #333;
+      }
+
+      #message-input-container {
+        margin-top: auto;
+        padding: 20px;
+        border-top: 1px solid #333;
+        display: flex;
+        gap: 10px;
+      }
+
+      #message-input {
+        flex: 1;
+        padding: 10px;
+        background-color: #333;
+        border: none;
+        border-radius: 5px;
+        color: white;
+      }
+
+      #send-button {
+        padding: 10px 20px;
+        background-color: #4a90e2;
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+      }
+
+      #send-button:hover {
+        background-color: #357abd;
+      }
+
+      #nav-tab {
+        padding: 15px;
+        border-top: 1px solid #333;
+        display: flex;
+        justify-content: space-around;
+        background-color: #1a1a1a;
+      }
+
+      .nav-item {
+        text-decoration: none;
+        color: white;
+        padding: 10px 20px;
+        border-radius: 5px;
+        transition: background-color 0.2s;
+      }
+
+      .nav-item:hover {
+        background-color: #333;
+      }
+
+      .nav-item.active {
+        background-color: #4a90e2;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="messages-container">
+      <div id="left-panel">
+        <div id="search-container">
+          <input type="text" id="user-search" placeholder="Search users...">
+        </div>
+        <div id="users-list"></div>
+      </div>
+      <div id="right-panel">
+        <div id="chat-content">
+          <div id="message-input-container">
+            <input type="text" id="message-input" placeholder="Type a message...">
+            <button id="send-button">Send</button>
+          </div>
+        </div>
+        <div id="nav-tab">
+          <a href="index.html" class="nav-item" data-page="home">Home</a>
+          <a href="character.html" class="nav-item" data-page="character">Character</a>
+          <a href="messages.html" class="nav-item active" data-page="messages">Messages</a>
+          <a href="notifications.html" class="nav-item" data-page="notifications">Notifications</a>
+          <a href="#" class="nav-item logout-button" id="logout-button">Logout</a>
+        </div>
+      </div>
+    </div>
+
+    <script type="module">
+      import * as THREE from 'three';
+      import { Messages } from './src/pages/Messages.js';
+
+      // Initialize Three.js scene
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+      const renderer = new THREE.WebGLRenderer();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      // Initialize Messages
+      const messages = new Messages(scene, camera, renderer);
+      messages.show();
+
+      // Handle window resize
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+      });
+
+      // Animation loop
+      function animate() {
+        requestAnimationFrame(animate);
+        renderer.render(scene, camera);
+      }
+      animate();
+      
+      // Add logout functionality
+      const logoutButton = document.getElementById('logout-button');
+      if (logoutButton) {
+        logoutButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Clear authentication data
+          localStorage.removeItem('token');
+          localStorage.removeItem('currentUser');
+          
+          // Redirect to home page
+          window.location.href = 'index.html';
+        });
+      }
+    </script>
+  </body>
+</html> 
