@@ -163,7 +163,7 @@ export class Notifications {
 
   async loadNotifications() {
     try {
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/notifications');
+      const response = await makeAuthenticatedRequest('/api/notifications');
       if (!response.ok) {
         throw new Error('Failed to load notifications');
       }
@@ -529,7 +529,7 @@ export class Notifications {
     if (!postId) return null;
     
     try {
-      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/posts/${postId}`);
+      const response = await makeAuthenticatedRequest(`/api/posts/${postId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch post details');
       }
@@ -545,7 +545,7 @@ export class Notifications {
   async markAsRead(notificationId) {
     try {
       const response = await makeAuthenticatedRequest(
-        `http://localhost:5000/api/notifications/${notificationId}/read`,
+        `/api/notifications/${notificationId}/read`,
         'PUT'
       );
       if (!response.ok) {

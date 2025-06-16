@@ -4,6 +4,7 @@ import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/examples/jsm/loaders/DRACOLoader.js';
 import { makeAuthenticatedRequest } from '../utils/api.js';
 import { AuthStatus } from '../components/AuthStatus.js';
+import { API_BASE_URL } from '../utils/api.js'; // Added to use for WebSocket
 
 export class Home {
   constructor(scene, camera, renderer) {
@@ -56,6 +57,7 @@ export class Home {
     this.userPosts = new Map();
     this.currentUser = null;
     this.socket = null; // Initialize socket to null
+    this.reconnectAttempts = 0; // Initialize reconnection attempts
     
     // Add diorama editing system
     this.dioramaEditing = {
@@ -148,7 +150,7 @@ export class Home {
       this.hasUserInteracted = true;
     }, { once: true });
     
-    // Initialize WebSocket connection (but don't connect yet)
+    // Initialize WebSocket connection
     this.initWebSocket();
 
     this.REACTION_TYPES = {
@@ -181,530 +183,122 @@ export class Home {
     this.initializeVariations();
   }
 
-  // Initialize WebSocket connection
+  // Initialize WebSocket connection for real-time updates
   initWebSocket() {
-    try {
-      // Check if we've exceeded max reconnection attempts
-      if (this.reconnectAttempts && this.reconnectAttempts >= 5) {
-        console.log('Maximum WebSocket reconnection attempts reached. Disabling WebSocket functionality.');
-        return;
-      }
-      
-      // Only initialize socket if authenticated
-      const token = localStorage.getItem('token');
-      if (!token) {
-        console.log('Not initializing WebSocket - no authentication token');
-        return;
-      }
-      
-      // Try to use secure WebSocket if on HTTPS
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      
-      // Try different host options in order
-      const hostOptions = [
-        '127.0.0.1:5000',
-        'localhost:5000',
-        window.location.hostname + ':5000'
-      ];
-      
-      // Get a host that might work
-      const host = hostOptions[0];  // Start with first option
-      
-      // Try to connect with a timeout
-      const socketUrl = `${protocol}//${host}`;
-      console.log(`Attempting to connect to WebSocket at ${socketUrl}`);
-      
-      // Set a timeout to prevent hanging on connection
-      this.wsConnectTimeout = setTimeout(() => {
-        console.log('WebSocket connection timeout - continuing without WebSocket functionality');
-        if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
-          this.socket.close();
-          this.socket = null;
-        }
-      }, 3000);
-      
-      // Handle potential socket creation error (browser might throw if WebSocket is not supported)
-      try {
-        this.socket = new WebSocket(socketUrl);
-      } catch (socketError) {
-        console.error('Failed to create WebSocket connection:', socketError);
-        clearTimeout(this.wsConnectTimeout);
-        console.log('Continuing without WebSocket functionality');
-        return;
-      }
-      
-      this.socket.onopen = () => {
-        console.log('WebSocket connection established');
-        clearTimeout(this.wsConnectTimeout);
-        // Reset reconnect attempts on successful connection
-        this.reconnectAttempts = 0;
-        
-        // Send authentication token
-        if (token) {
-          this.socket.send(JSON.stringify({ type: 'auth', token }));
-        }
-      };
-      
-      this.socket.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          console.log('WebSocket message received:', data);
-          if (data.type === 'reaction') {
-            this.handleReactionUpdate(data);
-          }
-        } catch (error) {
-          console.error('Error processing WebSocket message:', error);
-        }
-      };
-      
-      this.socket.onerror = (error) => {
-        console.error('WebSocket error - WebSocket functionality will be unavailable');
-        clearTimeout(this.wsConnectTimeout);
-        
-        // We'll just proceed without WebSocket functionality
-        console.log('Continuing without WebSocket real-time updates');
-        this.socket = null;
-      };
-      
-      this.socket.onclose = (event) => {
-        console.log('WebSocket connection closed - real-time updates disabled');
-        clearTimeout(this.wsConnectTimeout);
-        this.socket = null;
-        
-        // Only try to reconnect if actively using the app
-        if (this.isActive) {
-          // Try to reconnect after a delay, but with backing off
-          this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
-          
-          if (this.reconnectAttempts >= 5) {
-            console.log('Maximum WebSocket reconnection attempts reached. Disabling WebSocket functionality.');
-            return;
-          }
-          
-          const delay = Math.min(5000 + this.reconnectAttempts * 1000, 30000);
-          console.log(`Will attempt to reconnect in ${delay/1000} seconds (attempt ${this.reconnectAttempts} of 5)`);
-          
-          this.reconnectTimeout = setTimeout(() => {
-            if (this.isActive) {
-              this.initWebSocket();
-            }
-          }, delay);
-        }
-      };
-    } catch (error) {
-      console.error('Failed to initialize WebSocket:', error);
-      clearTimeout(this.wsConnectTimeout);
-      console.log('Continuing without WebSocket functionality - app will work but without real-time updates');
-      // Continue without WebSocket - we'll try again later if needed
+    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
+      console.log('WebSocket already open, closing existing connection.');
+      this.socket.close();
+      this.socket = null;
     }
-  }
 
-  async show() {
-    console.log('Showing Home page');
-    
-    // Clear internal caches to ensure we reload fresh data
-    this.characterCache = null;
-    this.allUsers = [];
-    this.userPosts.clear();
-    
-    // Check authentication first
-    const isAuthenticated = await this.checkAuth();
-    if (!isAuthenticated) {
-      console.log('Not authenticated, showing auth modal');
-      const authModal = document.getElementById('auth-modal');
-      if (authModal) {
-        authModal.style.display = 'flex';
-      }
+    // Check if we've exceeded max reconnection attempts
+    if (this.reconnectAttempts >= 5) {
+      console.log('Maximum WebSocket reconnection attempts reached. Disabling WebSocket functionality.');
       return;
     }
 
-    this.isActive = true;
-    
-    // Initialize WebSocket if not already connected
-    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
-      this.initWebSocket();
+    // Only initialize socket if authenticated
+    const token = localStorage.getItem('token');
+    if (!token) {
+      console.log('Not initializing WebSocket - no authentication token');
+      return;
     }
-    
-    // Set up starry background
-    this.setupBackground();
-    
-    // Initialize the scene
-    await this.init();
-    
-    // Add containers to scene
-    this.scene.add(this.dioramas);
-    this.scene.add(this.posts);
-    
-    // Clear any existing dioramas before creating new ones
-    while (this.dioramas.children.length > 0) {
-      this.dioramas.remove(this.dioramas.children[0]);
-    }
-    this.visibleDioramas = [];
-    
-    // Create edit mode toggle button
-    this.createEditModeButton();
-    
-    // Get fresh character data directly from the character API endpoint
-    let freshCharacterData = null;
-    try {
-      const characterResponse = await makeAuthenticatedRequest('http://localhost:5000/api/users/character');
-      if (characterResponse.ok) {
-        const responseData = await characterResponse.json();
-        console.log('Successfully loaded character response from API:', responseData);
-        
-        // Handle the case where character data is nested under 'character' property
-        if (responseData.character) {
-          this.freshCharacterData = responseData.character;
-          console.log('Character data was nested, extracted:', this.freshCharacterData);
-        } else {
-          this.freshCharacterData = responseData;
-          console.log('Using direct character data from API:', this.freshCharacterData);
-        }
-        
-        // Ensure variations and colors are complete
-        if (!this.freshCharacterData.variations) this.freshCharacterData.variations = {};
-        if (!this.freshCharacterData.colors) this.freshCharacterData.colors = {};
-        
-        // Ensure all character parts have values
-        const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-        parts.forEach(part => {
-          if (this.freshCharacterData.variations[part] === undefined) {
-            this.freshCharacterData.variations[part] = 0;
-          }
-          if (this.freshCharacterData.colors[part] === undefined) {
-            const defaultColors = {
-              head: 0xffcc99,
-              teeth: 0xffffff,
-              shirt: 0x0000ff,
-              belt: 0x000000,
-              pants: 0x000080,
-              shoes: 0x222222
-            };
-            this.freshCharacterData.colors[part] = defaultColors[part];
-          }
-        });
-        
-        // Also add the bio if it's at the top level
-        if (responseData.bio && !this.freshCharacterData.bio) {
-          this.freshCharacterData.bio = responseData.bio;
-        }
-        
-        console.log('Processed fresh character data:', this.freshCharacterData);
-      } else {
-        console.log('Failed to get character data from API, will try via user data');
-      }
-    } catch (error) {
-      console.error('Error fetching character data directly:', error);
-    }
-    
-    // Load all users and their posts from API
-    await this.loadAllUsers();
-    
-    // Get current user with most up-to-date data
-    try {
-      // Always try to get from API first to ensure fresh user data
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/verify');
-      if (response.ok) {
-        const userData = await response.json();
-        this.currentUser = userData;
-        
-        // If we have fresh character data from the direct character endpoint, use it
-        if (this.freshCharacterData) {
-          console.log('Using freshly loaded character data for current user');
-          this.currentUser.character = JSON.parse(JSON.stringify(this.freshCharacterData));
-          
-          // Ensure the character has all necessary parts
-          if (!this.currentUser.character.variations) {
-            this.currentUser.character.variations = {};
-          }
-          if (!this.currentUser.character.colors) {
-            this.currentUser.character.colors = {};
-          }
-          
-          // Ensure all character parts have values
-          const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-          parts.forEach(part => {
-            if (this.currentUser.character.variations[part] === undefined) {
-              this.currentUser.character.variations[part] = 0;
-            }
-            if (this.currentUser.character.colors[part] === undefined) {
-              const defaultColors = {
-                head: 0xffcc99,
-                teeth: 0xffffff,
-                shirt: 0x0000ff,
-                belt: 0x000000,
-                pants: 0x000080,
-                shoes: 0x222222
-              };
-              this.currentUser.character.colors[part] = defaultColors[part];
-            }
-          });
-        }
-        
-        console.log('Current user loaded from API with latest character data:', this.currentUser.username);
-        
-        // Update localStorage with latest data including any fresh character data
-        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-      } else {
-        // Only fall back to localStorage if API fails
-        console.log('API request failed, using cached user data from localStorage');
-        const currentUserStr = localStorage.getItem('currentUser');
-        if (currentUserStr) {
-          this.currentUser = JSON.parse(currentUserStr);
-          
-          // If we have fresh character data from the direct character endpoint, use it
-          if (this.freshCharacterData) {
-            console.log('Using freshly loaded character data with cached user');
-            this.currentUser.character = JSON.parse(JSON.stringify(this.freshCharacterData));
-            
-            // Ensure all character parts have values
-            if (!this.currentUser.character.variations) {
-              this.currentUser.character.variations = {};
-            }
-            if (!this.currentUser.character.colors) {
-              this.currentUser.character.colors = {};
-            }
-            
-            const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-            parts.forEach(part => {
-              if (this.currentUser.character.variations[part] === undefined) {
-                this.currentUser.character.variations[part] = 0;
-              }
-              if (this.currentUser.character.colors[part] === undefined) {
-                const defaultColors = {
-                  head: 0xffcc99,
-                  teeth: 0xffffff,
-                  shirt: 0x0000ff,
-                  belt: 0x000000,
-                  pants: 0x000080,
-                  shoes: 0x222222
-                };
-                this.currentUser.character.colors[part] = defaultColors[part];
-              }
-            });
-            
-            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error getting current user data:', error);
-      
-      // Even if user data fails, if we have character data, we can still use it
-      if (this.freshCharacterData) {
-        const currentUserStr = localStorage.getItem('currentUser');
-        if (currentUserStr) {
-          try {
-            this.currentUser = JSON.parse(currentUserStr);
-            this.currentUser.character = JSON.parse(JSON.stringify(this.freshCharacterData));
-            console.log('Merged fresh character data with cached user data');
-            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-          } catch (e) {
-            console.error('Failed to parse cached user data:', e);
-          }
-        }
-      }
-    }
-    
-    // Create dioramas for all users and load their posts
-    for (const user of this.allUsers) {
-      const yPosition = this.allUsers.indexOf(user) * (this.dioramaHeight + this.dioramaGap);
-      const dioramaIndex = this.allUsers.indexOf(user);
-      const diorama = this.createDiorama(yPosition, dioramaIndex);
-      
-      // Store user ID and username in diorama data
-      diorama.mesh.userData.userId = user._id;
-      diorama.mesh.userData.username = user.username;
-      
-      // Find if this user is the current user
-      const isCurrentUser = this.currentUser && user._id === this.currentUser._id;
-      
-      // If user is the current user, use the freshest character data (from API/localStorage)
-      if (isCurrentUser && this.currentUser.character) {
-        console.log('Using current user character data from user session');
-        
-        // Get freshly loaded character data from API directly
-        let characterData;
-        
-        // If we have freshCharacterData from the direct API call, use that
-        if (this.freshCharacterData) {
-          console.log('Using freshCharacterData from recent API call');
-          characterData = this.freshCharacterData;
-        } else {
-          // Ensure character data is in the correct format for processing
-          if (!this.currentUser.character.variations || Object.keys(this.currentUser.character.variations).length === 0) {
-            console.log('Character data needs proper structuring:', this.currentUser.character);
-            characterData = {
-              variations: {},
-              colors: {},
-              bio: this.currentUser.character.bio || this.currentUser.bio || ''
-            };
-            
-            // Add default variations and colors if missing
-            const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-            parts.forEach(part => {
-              if (!characterData.variations[part]) characterData.variations[part] = 0;
-              if (!characterData.colors[part]) {
-                const defaultColors = {
-                  head: 0xffcc99,
-                  teeth: 0xffffff,
-                  shirt: 0x0000ff,
-                  belt: 0x000000,
-                  pants: 0x000080,
-                  shoes: 0x222222
-                };
-                characterData.colors[part] = defaultColors[part];
-              }
-            });
-          } else {
-            characterData = this.currentUser.character;
-          }
-        }
-        
-        console.log(`Loading character for current user ${user.username} with data:`, characterData);
-        this.characterCreator.loadCharacter(characterData);
-        const character = this.characterCreator.character.clone();
-        character.position.set(-2, -2, -this.dioramaDepth/2);
-        character.rotation.y = Math.PI * 0.25;
-        character.userData.isCharacter = true;
-        character.userData.userId = user._id;
-        diorama.mesh.add(character);
-      }
-      // Otherwise, use character data from loaded users
-      else if (user.character) {
-        // Handle both nested and flat character data structures
-        const characterData = user.character.variations ? user.character : { 
-          variations: user.character.variations || {},
-          colors: user.character.colors || {},
-          bio: user.character.bio || user.bio || ''
-        };
-        
-        console.log(`Loading character for user ${user.username}:`, characterData);
-        this.characterCreator.loadCharacter(characterData);
-        const character = this.characterCreator.character.clone();
-        character.position.set(-2, -2, -this.dioramaDepth/2);
-        character.rotation.y = Math.PI * 0.25;
-        character.userData.isCharacter = true;
-        character.userData.userId = user._id;
-        diorama.mesh.add(character);
-      } else {
-        console.log(`No character data found for user ${user.username}`);
-        
-        // Create default character for users without character data
-        const defaultCharacterData = {
-          variations: {
-            head: 0,
-            teeth: 0,
-            shirt: 0,
-            belt: 0,
-            pants: 0,
-            shoes: 0
-          },
-          colors: {
-            head: 0xffcc99,
-            teeth: 0xffffff,
-            shirt: 0x0000ff,
-            belt: 0x000000,
-            pants: 0x000080,
-            shoes: 0x222222
-          },
-          bio: `Hello, I'm ${user.username}! Welcome to my space.`
-        };
-        
-        console.log(`Creating default character for user ${user.username}`);
-        this.characterCreator.loadCharacter(defaultCharacterData);
-        const character = this.characterCreator.character.clone();
-        character.position.set(-2, -2, -this.dioramaDepth/2);
-        character.rotation.y = Math.PI * 0.25;
-        character.userData.isCharacter = true;
-        character.userData.userId = user._id;
-        diorama.mesh.add(character);
-        
-        // If this is the current user, create a way to prompt them to customize their character
-        if (isCurrentUser) {
-          // Add a custom bubble to prompt character creation
-          const bubbleGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-          const bubbleMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4a90e2,
-            transparent: true,
-            opacity: 0.7
-          });
-          const bubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-          bubble.position.set(-1, -1, -this.dioramaDepth/2 + 1);
-          bubble.userData.isPrompt = true;
-          bubble.userData.type = 'character-prompt';
-          diorama.mesh.add(bubble);
-          
-          // Add a pulse animation to the bubble
-          const pulseAnimation = () => {
-            if (!this.isActive) return;
-            const scale = 1 + 0.1 * Math.sin(Date.now() * 0.003);
-            bubble.scale.set(scale, scale, scale);
-            requestAnimationFrame(pulseAnimation);
-          };
-          pulseAnimation();
-        }
-      }
-      
-      // Load and display user's posts
-      const userPosts = this.userPosts.get(user._id) || [];
-      userPosts.forEach(post => {
-        this.createVisualPost(post, diorama);
-      });
-    }
-    
-    // Start animation loop
-    this.animate();
-  }
 
-  async checkAuth() {
+    const wsProtocol = API_BASE_URL.startsWith('https') ? 'wss' : 'ws';
+    // Ensure that API_BASE_URL doesn't have a trailing slash if /api/realtime is prepended
+    const baseWithoutSlash = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    const wsUrl = `${wsProtocol}://${baseWithoutSlash.split('//')[1]}/api/realtime`;
+
+    console.log(`Attempting to connect to WebSocket at ${wsUrl}`);
+
+    this.wsConnectTimeout = setTimeout(() => {
+      console.log('WebSocket connection timeout - continuing without WebSocket functionality');
+      if (this.socket && this.socket.readyState === WebSocket.CONNECTING) {
+        this.socket.close();
+        this.socket = null;
+      }
+    }, 3000);
+
     try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('No token found');
-        return false;
-      }
-      
-      // Always verify token with server and get fresh character data
-      try {
-        console.log('Verifying token and getting fresh character data');
-        const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/verify');
-        
-        if (!response.ok) {
-          throw new Error('Invalid token');
-        }
-        
-        const userData = await response.json();
-        // Update current user with complete data from server, including latest character data
-        this.currentUser = {
-          _id: userData._id,
-          username: userData.username,
-          bio: userData.bio || '',
-          character: userData.character || null
-        };
-        
-        console.log('Received fresh character data from API verification');
-        
-        try {
-          // Store complete user data including character
-          localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-        } catch (storageError) {
-          console.error('Storage error while updating user data:', storageError);
-          // If storage fails, we already have the data in memory
-        }
-        
-        return true;
-      } catch (error) {
-        console.error('Auth verification failed:', error);
-        localStorage.removeItem('token');
-        localStorage.removeItem('currentUser');
-        return false;
-      }
-    } catch (error) {
-      console.error('Unexpected error in checkAuth:', error);
-      return false;
+      this.socket = new WebSocket(wsUrl);
+    } catch (socketError) {
+      console.error('Failed to create WebSocket connection:', socketError);
+      clearTimeout(this.wsConnectTimeout);
+      console.log('Continuing without WebSocket functionality');
+      return;
     }
+
+    this.socket.onopen = () => {
+      clearTimeout(this.wsConnectTimeout);
+      console.log('WebSocket connected - real-time updates enabled');
+      this.reconnectAttempts = 0; // Reset reconnection attempts on success
+      // You might want to send the auth token here, e.g., this.socket.send(JSON.stringify({ type: 'auth', token: token }));
+    };
+
+    this.socket.onmessage = (event) => {
+      // Handle incoming messages
+      console.log('WebSocket message received:', event.data);
+      // Example:
+      // const data = JSON.parse(event.data);
+      // if (data.type === 'newPost') {
+      //   this.addPost(data.post);
+      // }
+    };
+
+    this.socket.onclose = (event) => {
+      console.log(`WebSocket connection closed - real-time updates disabled (Code: ${event.code}, Reason: ${event.reason})`);
+      // Attempt to reconnect if needed
+      if (event.code !== 1000 && event.code !== 1001 && event.code !== 1005) { // Exclude normal closures
+        this.reconnectAttempts = (this.reconnectAttempts || 0) + 1;
+        const reconnectDelay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Exponential backoff max 30s
+        console.log(`Attempting to reconnect in ${reconnectDelay / 1000} seconds...`);
+        setTimeout(() => this.initWebSocket(), reconnectDelay);
+      }
+    };
+
+    this.socket.onerror = (error) => {
+      console.error('WebSocket error - WebSocket functionality will be unavailable:', error);
+      clearTimeout(this.wsConnectTimeout);
+      if (this.socket) {
+        this.socket.close();
+        this.socket = null;
+      }
+    };
+  }
+  
+  // Method to check authentication status
+  async checkAuth() {
+      console.log('Verifying token and getting fresh character data');
+      try {
+          const response = await makeAuthenticatedRequest('/api/users/verify');
+          if (response.ok) {
+              const userData = await response.json();
+              if (userData && userData.character) { // Ensure character data is present
+                  this.currentUser = userData;
+                  // Store essential user data, avoiding large character data if not needed
+                  const minimalUserData = {
+                      _id: userData._id,
+                      username: userData.username,
+                      bio: userData.bio || ''
+                  };
+                  if (userData.character && !this.isDataTooLarge(userData.character)) {
+                      minimalUserData.character = userData.character;
+                  }
+                  localStorage.setItem('currentUser', JSON.stringify(minimalUserData));
+                  return true;
+              } else {
+                  console.log('Valid API response but no character data found on verify.');
+                  return false;
+              }
+          } else {
+              throw new Error('Auth verification failed');
+          }
+      } catch (error) {
+          console.error('Auth verification failed:', error);
+          localStorage.removeItem('token');
+          localStorage.removeItem('currentUser');
+          return false;
+      }
   }
 
   async init() {
@@ -1147,7 +741,7 @@ export class Home {
       console.log('Sending post data:', postData);
       
       // Create post in database
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/posts', 'POST', postData);
+      const response = await makeAuthenticatedRequest('/api/posts', 'POST', postData);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -2214,7 +1808,7 @@ export class Home {
       
       // Make API request to delete post
       const response = await makeAuthenticatedRequest(
-        `http://localhost:5000/api/posts/${postId}`,
+        `/api/posts/${postId}`,
         'DELETE'
       );
       
@@ -2394,161 +1988,42 @@ export class Home {
   async loadAllUsers() {
     try {
       console.log('Loading all users with fresh data from API');
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users');
-      
-      if (!response.ok) {
-        throw new Error('Failed to load users from API');
-      }
-      
-      const users = await response.json();
-      
-      if (Array.isArray(users)) {
-        // Store complete user data including full character information
-        this.allUsers = users.map(user => {
-          // Process character data to ensure it's in the correct format
-          let character = null;
-          if (user.character) {
-            character = {
-              variations: user.character.variations || {},
-              colors: user.character.colors || {},
-              bio: user.character.bio || user.bio || ''
-            };
-            
-            // Ensure variations and colors are not undefined
-            if (!character.variations) character.variations = {};
-            if (!character.colors) character.colors = {};
-          }
-          
-          return {
-            _id: user._id,
-            username: user.username,
-            bio: user.bio || '',
-            character: character
-          };
-        });
-        console.log('Loaded users with fresh character data:', this.allUsers.length);
-        
-        // If we have the current user from memory, update their data in allUsers
-        if (this.currentUser && this.currentUser._id) {
-          const userIndex = this.allUsers.findIndex(u => u._id === this.currentUser._id);
-          if (userIndex >= 0) {
-            console.log(`Updating user ${this.allUsers[userIndex].username} with current user character data`);
-            
-            // If we have fresh character data from API, use that
-            if (this.freshCharacterData) {
-              console.log('Using freshly loaded character data from API for user in allUsers');
-              this.allUsers[userIndex].character = JSON.parse(JSON.stringify(this.freshCharacterData));
-            } 
-            // Otherwise use character data from currentUser
-            else if (this.currentUser.character) {
-              // Ensure character data is in the correct format
-              let characterData = this.currentUser.character;
-              if (!characterData.variations || !characterData.colors) {
-                characterData = {
-                  variations: characterData.variations || {},
-                  colors: characterData.colors || {},
-                  bio: characterData.bio || this.currentUser.bio || ''
-                };
-              }
-              
-              // Ensure all character parts have values
-              const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-              parts.forEach(part => {
-                if (characterData.variations[part] === undefined) {
-                  characterData.variations[part] = 0;
-                }
-                if (characterData.colors[part] === undefined) {
-                  const defaultColors = {
-                    head: 0xffcc99,
-                    teeth: 0xffffff,
-                    shirt: 0x0000ff,
-                    belt: 0x000000,
-                    pants: 0x000080,
-                    shoes: 0x222222
-                  };
-                  characterData.colors[part] = defaultColors[part];
-                }
-              });
-              
-              this.allUsers[userIndex].character = characterData;
-            }
-          }
-        }
-        
-        // Load posts for each user
-        for (const user of this.allUsers) {
-          await this.loadUserPosts(user._id);
-        }
+      const response = await makeAuthenticatedRequest('/api/users');
+      if (response.ok) {
+        const users = await response.json();
+        this.allUsers = users;
       } else {
-        console.error('Invalid users response:', users);
+        console.error('Failed to load users:', response.statusText);
+        // Fallback to local storage if API fails, but log the error
+        const localUsers = localStorage.getItem('allUsers');
+        if (localUsers) {
+          this.allUsers = JSON.parse(localUsers);
+        }
       }
     } catch (error) {
       console.error('Error loading users:', error);
-      
-      // If API fails, try to use cached data as fallback
-      const currentUserStr = localStorage.getItem('currentUser');
-      if (currentUserStr) {
-        try {
-          const currentUser = JSON.parse(currentUserStr);
-          if (currentUser && currentUser._id) {
-            console.log('Using cached data for current user as fallback');
-            
-            // Ensure character data is in the correct format
-            if (currentUser.character) {
-              if (!currentUser.character.variations || !currentUser.character.colors) {
-                currentUser.character = {
-                  variations: currentUser.character.variations || {},
-                  colors: currentUser.character.colors || {},
-                  bio: currentUser.character.bio || currentUser.bio || ''
-                };
-              }
-            }
-            
-            this.allUsers = [currentUser];
-          }
-        } catch (e) {
-          console.error('Error parsing currentUser from localStorage:', e);
-        }
+      // Fallback to local storage on network error
+      const localUsers = localStorage.getItem('allUsers');
+      if (localUsers) {
+        this.allUsers = JSON.parse(localUsers);
       }
     }
   }
 
   async loadUserPosts(userId) {
     try {
-      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/posts/user/${userId}`);
+      const response = await makeAuthenticatedRequest(`/api/posts/user/${userId}`);
       const result = await response.json();
-      
-      if (result.success && Array.isArray(result.data)) {
-        // Store posts in memory
-        this.userPosts.set(userId, result.data);
-        console.log(`Loaded ${result.data.length} posts for user ${userId}`);
-        
-        // Find the correct diorama for this user
-        const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === userId);
-        if (userDiorama) {
-          // Clear existing posts for this diorama
-          const existingPosts = userDiorama.mesh.children.filter(child => 
-            child.userData && child.userData.isPost
-          );
-          
-          // Remove posts from scene
-          existingPosts.forEach(post => userDiorama.mesh.remove(post));
-          
-          // Clear post data arrays
-          if (userDiorama.mesh.userData.posts) {
-            userDiorama.mesh.userData.posts = [];
-          }
-          
-          // Create visual posts for the loaded posts
-          result.data.forEach(post => {
-            this.createVisualPost(post, userDiorama);
-          });
-        }
+      if (response.ok) {
+        this.userPosts.set(userId, result);
+        return result;
       } else {
-        console.error('Invalid posts response:', result);
+        console.error(`Failed to load posts for user ${userId}:`, result.message || response.statusText);
+        return [];
       }
     } catch (error) {
       console.error(`Error loading posts for user ${userId}:`, error);
+      return [];
     }
   }
 
@@ -2581,7 +2056,7 @@ export class Home {
   async handleReaction(postId, reactionType) {
     try {
       const response = await makeAuthenticatedRequest(
-        `http://localhost:5000/api/posts/${postId}/react`,
+        `/api/posts/${postId}/react`,
         'POST',
         { type: this.REACTION_TYPES[reactionType] }
       );
@@ -2638,62 +2113,20 @@ export class Home {
 
   async loadPosts() {
     try {
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/posts');
+      const response = await makeAuthenticatedRequest('/api/posts');
       const result = await response.json();
-      
-      if (result.posts && Array.isArray(result.posts)) {
-        console.log('Loaded posts:', result.posts);
-        
-        // Group posts by user ID
-        const postsByUser = new Map();
-        result.posts.forEach(post => {
-          const userId = post.userId;
-          if (!postsByUser.has(userId)) {
-            postsByUser.set(userId, []);
-          }
-          postsByUser.get(userId).push(post);
+      if (response.ok) {
+        this.posts.children.forEach(mesh => {
+          this.scene.remove(mesh);
+          mesh.geometry.dispose();
+          mesh.material.dispose();
         });
-        
-        // Update our main userPosts map with any new posts
-        postsByUser.forEach((posts, userId) => {
-          const existingPosts = this.userPosts.get(userId) || [];
-          
-          // Filter out duplicates - only add posts we don't already have
-          const newPosts = posts.filter(newPost => 
-            !existingPosts.some(existingPost => existingPost._id === newPost._id)
-          );
-          
-          if (newPosts.length > 0) {
-            this.userPosts.set(userId, [...existingPosts, ...newPosts]);
-            console.log(`Added ${newPosts.length} new posts for user ${userId}`);
-          }
-        });
-        
-        // Create visual posts for visible dioramas - only for new posts
-        this.visibleDioramas.forEach(diorama => {
-          const userId = diorama.mesh.userData.userId;
-          const allUserPosts = this.userPosts.get(userId) || [];
-          
-          // Get list of post IDs already in the diorama
-          const existingPostIds = new Set();
-          if (diorama.mesh.userData.posts) {
-            diorama.mesh.userData.posts.forEach(post => {
-              existingPostIds.add(post.postId);
-            });
-          }
-          
-          // Filter posts to only create ones we don't already have visually
-          const postsToCreate = allUserPosts.filter(post => !existingPostIds.has(post._id));
-          
-          if (postsToCreate.length > 0) {
-            console.log(`Creating ${postsToCreate.length} new visual posts for user ${userId}`);
-            postsToCreate.forEach(post => {
-              this.createVisualPost(post, diorama);
-            });
-          }
+        this.posts.clear();
+        result.forEach(post => {
+          this.createVisualPost(post, this.dioramas.children[0]); // Assuming first diorama is user's
         });
       } else {
-        console.error('Invalid posts response format:', result);
+        console.error('Failed to load posts:', result.message || response.statusText);
       }
     } catch (error) {
       console.error('Error loading posts:', error);
@@ -3145,7 +2578,7 @@ export class Home {
     if (!object || !object.userData) return;
     
     try {
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/character', {
+      const response = await makeAuthenticatedRequest('/api/users/character', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json'
