@@ -1,9 +1,8 @@
 // src/utils/api.js
 
 // Determine API base URL based on environment
-// In development, this will be http://localhost:5000
-// In production (Render), this will be set via VITE_API_BASE_URL environment variable
-export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+// TEMPORARY: Hardcoding Render URL to debug VITE_API_BASE_URL issue
+export const API_BASE_URL = 'https://iw-9wja.onrender.com';
 
 /**
  * Makes an authenticated request to the API
