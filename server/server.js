@@ -30,7 +30,8 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
 app.use(cors({
   origin: [
-    'https://iw-9wja.onrender.com'
+    'https://iw-9wja.onrender.com',
+    'http://localhost:5173'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],

@@ -1,8 +1,8 @@
 // src/utils/api.js
 
 // Determine API base URL based on environment
-// TEMPORARY: Hardcoding Render URL to debug VITE_API_BASE_URL issue
-export const API_BASE_URL = 'https://iw-9wja.onrender.com';
+// TEMPORARY: Hardcoding to localhost for local debugging
+export const API_BASE_URL = 'http://localhost:5000';
 
 /**
  * Makes an authenticated request to the API
