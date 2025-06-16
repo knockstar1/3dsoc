@@ -19,11 +19,8 @@ dotenv.config();
 
 const app = express();
 
-// Serve static files from the base 3d-social directory (for index.html, etc.)
-app.use(express.static(path.join(__dirname, '..')));
-
-// Serve static files from the src directory (for main.js, styles)
-app.use(express.static(path.join(__dirname, '../src')));
+// Serve static files from Vite's build output directory (dist)
+app.use(express.static(path.join(__dirname, '../dist')));
 
 // Serve static files from the public directory (for fonts, models, favicon)
 app.use(express.static(path.join(__dirname, '../public')));
@@ -61,11 +58,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
-
-// Serve index.html for the root route
-app.get('/', (req, res) => {
-  res.sendFile(path.join(__dirname, '..', 'index.html'));
-});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
