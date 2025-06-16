@@ -1,13 +1,26 @@
+import { fileURLToPath } from 'url';
+import path from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// Determine API base URL based on environment
+// In development, this will be http://localhost:5000
+// In production (Render), this will be set via VITE_API_BASE_URL environment variable
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+
 /**
  * Makes an authenticated request to the API
- * @param {string} url - The URL to make the request to
+ * @param {string} endpoint - The API endpoint (e.g., '/api/users/login')
  * @param {string} method - The HTTP method to use (default: 'GET')
  * @param {object} data - The data to send in the request body (for non-GET requests)
  * @returns {Promise<Response>} - The response from the API
  */
-export async function makeAuthenticatedRequest(url, method = 'GET', data = null) {
+export async function makeAuthenticatedRequest(endpoint, method = 'GET', data = null) {
     const token = localStorage.getItem('token');
     
+    const url = `${API_BASE_URL}${endpoint}`;
+
     // Enhanced logging of API requests
     console.log(`Making ${method} request to ${url}` + (data ? ' with data' : ' without data'));
     if (data) {
@@ -25,10 +38,10 @@ export async function makeAuthenticatedRequest(url, method = 'GET', data = null)
     // Add body for non-GET requests
     if (method !== 'GET' && data) {
         // Special handling for endpoints that need direct data
-        if (url.includes('/character') && method === 'PUT' || 
-            url.includes('/posts') || 
-            url.includes('/messages') ||
-            url.includes('/reaction')) {
+        if (endpoint.includes('/character') && method === 'PUT' || 
+            endpoint.includes('/posts') || 
+            endpoint.includes('/messages') ||
+            endpoint.includes('/reaction')) {
             options.body = JSON.stringify(data);
         } else {
             options.body = JSON.stringify({ character: data });
