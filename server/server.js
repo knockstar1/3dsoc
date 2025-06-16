@@ -36,6 +36,11 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
+// Health Check Endpoint
+app.get('/healthz', (req, res) => {
+  res.status(200).send('OK');
+});
+
 // Connect to MongoDB
 mongoose.connect(process.env.MONGODB_URI, {
   useNewUrlParser: true,
