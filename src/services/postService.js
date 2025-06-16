@@ -1,11 +1,12 @@
 import axios from 'axios';
+import { API_BASE_URL } from '../utils/api.js';
 
-const API_URL = 'http://localhost:5000/api';
+// const API_URL = 'https://iw-9wja.onrender.com/api'; // Removed as API_BASE_URL is now centralized
 
 class PostService {
   constructor() {
     this.api = axios.create({
-      baseURL: API_URL,
+      baseURL: `${API_BASE_URL}/api`,
       withCredentials: true
     });
   }

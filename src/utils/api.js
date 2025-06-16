@@ -1,13 +1,9 @@
-import { fileURLToPath } from 'url';
-import path from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+// src/utils/api.js
 
 // Determine API base URL based on environment
 // In development, this will be http://localhost:5000
 // In production (Render), this will be set via VITE_API_BASE_URL environment variable
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
+export const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5000';
 
 /**
  * Makes an authenticated request to the API
