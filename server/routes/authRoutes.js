@@ -42,7 +42,12 @@ router.post('/register', async (req, res) => {
       character: user.character || {}
     });
   } catch (error) {
-    console.error('Registration error:', error);
+    console.error('Registration error details:', {
+      name: error.name,
+      message: error.message,
+      errors: error.errors || null, // For Mongoose validation errors
+      stack: error.stack
+    });
     res.status(500).json({ message: 'Error registering user' });
   }
 });
@@ -54,13 +59,18 @@ router.post('/login', async (req, res) => {
 
     // Find user
     const user = await User.findOne({ username });
+    console.log('Login attempt for username:', username);
     if (!user) {
+      console.log('User not found for login.');
       return res.status(400).json({ message: 'Invalid credentials' });
     }
+    console.log('User found for login:', user.username);
 
     // Check password
     const isMatch = await bcrypt.compare(password, user.password);
+    console.log('Password match result:', isMatch);
     if (!isMatch) {
+      console.log('Password does not match.');
       return res.status(400).json({ message: 'Invalid credentials' });
     }
 
@@ -78,7 +88,11 @@ router.post('/login', async (req, res) => {
       character: user.character || {}
     });
   } catch (error) {
-    console.error('Login error:', error);
+    console.error('Login error details:', {
+      name: error.name,
+      message: error.message,
+      stack: error.stack
+    });
     res.status(500).json({ message: 'Error logging in' });
   }
 });
