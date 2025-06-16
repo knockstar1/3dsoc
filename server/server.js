@@ -19,8 +19,14 @@ dotenv.config();
 
 const app = express();
 
-// Serve static files from the 'public' directory
+// Serve static files from the base 3d-social directory (for index.html, etc.)
 app.use(express.static(path.join(__dirname, '..')));
+
+// Serve static files from the src directory (for main.js, styles)
+app.use(express.static(path.join(__dirname, '../src')));
+
+// Serve static files from the public directory (for fonts, models, favicon)
+app.use(express.static(path.join(__dirname, '../public')));
 
 // Middleware
 app.use(express.json());
