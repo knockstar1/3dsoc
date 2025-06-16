@@ -29,9 +29,7 @@ app.use(express.static(path.join(__dirname, '../public')));
 app.use(express.json());
 app.use(cors({
   origin: [
-    'http://localhost:5173',  // Vite default port
-    'http://localhost:3000',  // React default port
-    'http://localhost:5000'   // Backend port
+    'https://iw-9wja.onrender.com'
   ],
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization'],
