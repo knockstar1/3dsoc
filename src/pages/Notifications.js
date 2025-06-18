@@ -529,7 +529,7 @@ export class Notifications {
     if (!postId) return null;
     
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/posts/${postId}`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/posts/${postId}`);
       if (!response.ok) {
         throw new Error('Failed to fetch post details');
       }
@@ -545,7 +545,7 @@ export class Notifications {
   async markAsRead(notificationId) {
     try {
       const response = await makeAuthenticatedRequest(
-        `${import.meta.env.VITE_API_URL}/notifications/${notificationId}/read`,
+        `https://threedsocbackend.onrender.com/api/notifications/${notificationId}/read`,
         'PUT'
       );
       if (!response.ok) {

@@ -376,2012 +376,169 @@ export class Home {
             this.freshCharacterData.colors[part] = defaultColors[part];
           }
         });
-        
-        // Also add the bio if it's at the top level
-        if (responseData.bio && !this.freshCharacterData.bio) {
-          this.freshCharacterData.bio = responseData.bio;
-        }
-        
-        console.log('Processed fresh character data:', this.freshCharacterData);
       } else {
-        console.log('Failed to get character data from API, will try via user data');
+        console.error('Failed to load character data from API:', await characterResponse.text());
+        // Fallback to default if API fails
+        this.freshCharacterData = null;
+        console.log('Using default character data due to API failure.');
       }
     } catch (error) {
-      console.error('Error fetching character data directly:', error);
+      console.error('Error fetching character data:', error);
+      this.freshCharacterData = null;
+      console.log('Using default character data due to error.');
     }
-    
-    // Load all users and their posts from API
-    await this.loadAllUsers();
-    
-    // Get current user with most up-to-date data
+
+    // Set initial current user with dummy data if not authenticated, to prevent errors
+    // during character loading before full authentication flow
+    if (!localStorage.getItem('currentUser')) {
+      localStorage.setItem('currentUser', JSON.stringify({ _id: 'guest', username: 'Guest' }));
+    }
+
+    // Get all users
     try {
-      // Always try to get from API first to ensure fresh user data
-      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/verify`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users`);
       if (response.ok) {
-        const userData = await response.json();
-        this.currentUser = userData;
-        
-        // If we have fresh character data from the direct character endpoint, use it
-        if (this.freshCharacterData) {
-          console.log('Using freshly loaded character data for current user');
-          this.currentUser.character = JSON.parse(JSON.stringify(this.freshCharacterData));
-          
-          // Ensure the character has all necessary parts
-          if (!this.currentUser.character.variations) {
-            this.currentUser.character.variations = {};
-          }
-          if (!this.currentUser.character.colors) {
-            this.currentUser.character.colors = {};
-          }
-          
-          // Ensure all character parts have values
-          const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-          parts.forEach(part => {
-            if (this.currentUser.character.variations[part] === undefined) {
-              this.currentUser.character.variations[part] = 0;
-            }
-            if (this.currentUser.character.colors[part] === undefined) {
-              const defaultColors = {
-                head: 0xffcc99,
-                teeth: 0xffffff,
-                shirt: 0x0000ff,
-                belt: 0x000000,
-                pants: 0x000080,
-                shoes: 0x222222
-              };
-              this.currentUser.character.colors[part] = defaultColors[part];
-            }
-          });
-        }
-        
-        console.log('Current user loaded from API with latest character data:', this.currentUser.username);
-        
-        // Update localStorage with latest data including any fresh character data
-        localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
+        this.allUsers = await response.json();
+        console.log('All users loaded:', this.allUsers);
       } else {
-        // Only fall back to localStorage if API fails
-        console.log('API request failed, using cached user data from localStorage');
-        const currentUserStr = localStorage.getItem('currentUser');
-        if (currentUserStr) {
-          this.currentUser = JSON.parse(currentUserStr);
-          
-          // If we have fresh character data from the direct character endpoint, use it
-          if (this.freshCharacterData) {
-            console.log('Using freshly loaded character data with cached user');
-            this.currentUser.character = JSON.parse(JSON.stringify(this.freshCharacterData));
-            
-            // Ensure all character parts have values
-            if (!this.currentUser.character.variations) {
-              this.currentUser.character.variations = {};
-            }
-            if (!this.currentUser.character.colors) {
-              this.currentUser.character.colors = {};
-            }
-            
-            const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-            parts.forEach(part => {
-              if (this.currentUser.character.variations[part] === undefined) {
-                this.currentUser.character.variations[part] = 0;
-              }
-              if (this.currentUser.character.colors[part] === undefined) {
-                const defaultColors = {
-                  head: 0xffcc99,
-                  teeth: 0xffffff,
-                  shirt: 0x0000ff,
-                  belt: 0x000000,
-                  pants: 0x000080,
-                  shoes: 0x222222
-                };
-                this.currentUser.character.colors[part] = defaultColors[part];
-              }
-            });
-            
-            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-          }
-        }
-      }
-    } catch (error) {
-      console.error('Error getting current user data:', error);
-      
-      // Even if user data fails, if we have character data, we can still use it
-      if (this.freshCharacterData) {
-        const currentUserStr = localStorage.getItem('currentUser');
-        if (currentUserStr) {
-          try {
-            this.currentUser = JSON.parse(currentUserStr);
-            this.currentUser.character = JSON.parse(JSON.stringify(this.freshCharacterData));
-            console.log('Merged fresh character data with cached user data');
-            localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-          } catch (e) {
-            console.error('Failed to parse cached user data:', e);
-          }
-        }
-      }
-    }
-    
-    // Create dioramas for all users and load their posts
-    for (const user of this.allUsers) {
-      const yPosition = this.allUsers.indexOf(user) * (this.dioramaHeight + this.dioramaGap);
-      const dioramaIndex = this.allUsers.indexOf(user);
-      const diorama = this.createDiorama(yPosition, dioramaIndex);
-      
-      // Store user ID and username in diorama data
-      diorama.mesh.userData.userId = user._id;
-      diorama.mesh.userData.username = user.username;
-      
-      // Find if this user is the current user
-      const isCurrentUser = this.currentUser && user._id === this.currentUser._id;
-      
-      // If user is the current user, use the freshest character data (from API/localStorage)
-      if (isCurrentUser && this.currentUser.character) {
-        console.log('Using current user character data from user session');
-        
-        // Get freshly loaded character data from API directly
-        let characterData;
-        
-        // If we have freshCharacterData from the direct API call, use that
-        if (this.freshCharacterData) {
-          console.log('Using freshCharacterData from recent API call');
-          characterData = this.freshCharacterData;
-        } else {
-          // Ensure character data is in the correct format for processing
-          if (!this.currentUser.character.variations || Object.keys(this.currentUser.character.variations).length === 0) {
-            console.log('Character data needs proper structuring:', this.currentUser.character);
-            characterData = {
-              variations: {},
-              colors: {},
-              bio: this.currentUser.character.bio || this.currentUser.bio || ''
-            };
-            
-            // Add default variations and colors if missing
-            const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-            parts.forEach(part => {
-              if (!characterData.variations[part]) characterData.variations[part] = 0;
-              if (!characterData.colors[part]) {
-                const defaultColors = {
-                  head: 0xffcc99,
-                  teeth: 0xffffff,
-                  shirt: 0x0000ff,
-                  belt: 0x000000,
-                  pants: 0x000080,
-                  shoes: 0x222222
-                };
-                characterData.colors[part] = defaultColors[part];
-              }
-            });
-          } else {
-            characterData = this.currentUser.character;
-          }
-        }
-        
-        console.log(`Loading character for current user ${user.username} with data:`, characterData);
-        this.characterCreator.loadCharacter(characterData);
-        const character = this.characterCreator.character.clone();
-        character.position.set(-2, -2, -this.dioramaDepth/2);
-        character.rotation.y = Math.PI * 0.25;
-        character.userData.isCharacter = true;
-        character.userData.userId = user._id;
-        diorama.mesh.add(character);
-      }
-      // Otherwise, use character data from loaded users
-      else if (user.character) {
-        // Handle both nested and flat character data structures
-        const characterData = user.character.variations ? user.character : { 
-          variations: user.character.variations || {},
-          colors: user.character.colors || {},
-          bio: user.character.bio || user.bio || ''
-        };
-        
-        console.log(`Loading character for user ${user.username}:`, characterData);
-        this.characterCreator.loadCharacter(characterData);
-        const character = this.characterCreator.character.clone();
-        character.position.set(-2, -2, -this.dioramaDepth/2);
-        character.rotation.y = Math.PI * 0.25;
-        character.userData.isCharacter = true;
-        character.userData.userId = user._id;
-        diorama.mesh.add(character);
-      } else {
-        console.log(`No character data found for user ${user.username}`);
-        
-        // Create default character for users without character data
-        const defaultCharacterData = {
-          variations: {
-            head: 0,
-            teeth: 0,
-            shirt: 0,
-            belt: 0,
-            pants: 0,
-            shoes: 0
-          },
-          colors: {
-            head: 0xffcc99,
-            teeth: 0xffffff,
-            shirt: 0x0000ff,
-            belt: 0x000000,
-            pants: 0x000080,
-            shoes: 0x222222
-          },
-          bio: `Hello, I'm ${user.username}! Welcome to my space.`
-        };
-        
-        console.log(`Creating default character for user ${user.username}`);
-        this.characterCreator.loadCharacter(defaultCharacterData);
-        const character = this.characterCreator.character.clone();
-        character.position.set(-2, -2, -this.dioramaDepth/2);
-        character.rotation.y = Math.PI * 0.25;
-        character.userData.isCharacter = true;
-        character.userData.userId = user._id;
-        diorama.mesh.add(character);
-        
-        // If this is the current user, create a way to prompt them to customize their character
-        if (isCurrentUser) {
-          // Add a custom bubble to prompt character creation
-          const bubbleGeometry = new THREE.SphereGeometry(0.5, 32, 32);
-          const bubbleMaterial = new THREE.MeshBasicMaterial({
-            color: 0x4a90e2,
-            transparent: true,
-            opacity: 0.7
-          });
-          const bubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-          bubble.position.set(-1, -1, -this.dioramaDepth/2 + 1);
-          bubble.userData.isPrompt = true;
-          bubble.userData.type = 'character-prompt';
-          diorama.mesh.add(bubble);
-          
-          // Add a pulse animation to the bubble
-          const pulseAnimation = () => {
-            if (!this.isActive) return;
-            const scale = 1 + 0.1 * Math.sin(Date.now() * 0.003);
-            bubble.scale.set(scale, scale, scale);
-            requestAnimationFrame(pulseAnimation);
-          };
-          pulseAnimation();
-        }
-      }
-      
-      // Load and display user's posts
-      const userPosts = this.userPosts.get(user._id) || [];
-      userPosts.forEach(post => {
-        this.createVisualPost(post, diorama);
-      });
-    }
-    
-    // Start animation loop
-    this.animate();
-  }
-
-  async checkAuth() {
-    // Check if user is logged in and token is valid
-    const token = localStorage.getItem('token');
-    const currentUser = localStorage.getItem('currentUser');
-    if (!token || !currentUser) {
-      this.isAuth = false;
-      return;
-    }
-
-    try {
-      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/verify`);
-      if (response.ok) {
-        this.isAuth = true;
-        this.currentUser = JSON.parse(currentUser);
-      } else {
-        this.isAuth = false;
-        localStorage.removeItem('token');
-        localStorage.removeItem('currentUser');
-      }
-    } catch (error) {
-      console.error('Error during authentication check:', error);
-      this.isAuth = false;
-      localStorage.removeItem('token');
-      localStorage.removeItem('currentUser');
-    }
-  }
-
-  async init() {
-    console.log('Initializing Home page');
-    
-    // Load the bedroom model
-    await this.loadBedroomModel();
-    
-    // Add lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-    directionalLight.position.set(5, 5, 5);
-    this.scene.add(ambientLight, directionalLight);
-
-    // Setup scrolling
-    this.setupScrolling();
-
-    // Setup post creation
-    this.setupPostCreation();
-
-    // Setup camera
-    this.camera.position.z = 8;
-    
-    // Create initial diorama
-    this.createDiorama();
-    
-    // Setup event listeners
-    this.setupEventListeners();
-  }
-
-  async loadBedroomModel() {
-    try {
-      const response = await fetch('/models/modern-bedroom.glb');
-      if (!response.ok) {
-        throw new Error('Failed to load bedroom model');
-      }
-      
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
-      
-      this.bedroomModel = await new Promise((resolve, reject) => {
-        this.gltfLoader.load(
-          url,
-          (gltf) => {
-            // Mark furniture objects
-            gltf.scene.traverse((child) => {
-              if (child.isMesh) {
-                // Mark as furniture if it's not a wall or floor
-                if (!child.name.toLowerCase().includes('wall') && 
-                    !child.name.toLowerCase().includes('floor') &&
-                    !child.name.toLowerCase().includes('ceiling')) {
-                  child.userData.isFurniture = true;
-                }
-              }
-            });
-            resolve(gltf.scene);
-          },
-          undefined,
-          reject
-        );
-      });
-      
-      this.isModelLoaded = true;
-      console.log('Bedroom model loaded successfully');
-    } catch (error) {
-      console.error('Error loading bedroom model:', error);
-      this.isModelLoaded = false;
-    }
-  }
-
-  createDiorama(yPosition = 0, index = 0) {
-    // Create a new diorama group
-    const diorama = new THREE.Group();
-    
-    // Create a container for the room
-    const roomContainer = new THREE.Group();
-    
-    if (this.isModelLoaded && this.bedroomModel) {
-      // Clone the loaded model for this diorama
-      const roomClone = this.bedroomModel.clone();
-      
-      // Ensure furniture flags are preserved in the clone
-      roomClone.traverse((child) => {
-        if (child.isMesh && child.userData.isFurniture) {
-          child.userData.isFurniture = true;
-        }
-      });
-      
-      // Position and scale the room
-      roomClone.position.set(0, 0, -this.dioramaDepth/2);
-      roomClone.rotation.y = 0;
-      roomClone.scale.set(0.1, 0.1, 0.1);
-      
-      // Add the room to the container
-      roomContainer.add(roomClone);
-      
-      // Set up animations for this specific diorama
-      if (this.mixer) {
-        const mixer = new THREE.AnimationMixer(roomClone);
-        this.mixer._actions.forEach(action => {
-          const newAction = mixer.clipAction(action.getClip());
-          newAction.play();
-        });
-        roomClone.userData.mixer = mixer;
-      }
-    } else {
-      console.warn('Bedroom model not loaded, using fallback room');
-      // Fallback to basic room if model isn't loaded
-      const wallMaterial = new THREE.MeshPhongMaterial({
-        color: 0x808080,
-        side: THREE.DoubleSide
-      });
-      
-      const backWall = new THREE.Mesh(
-        new THREE.BoxGeometry(8, 8, 0.5),
-        wallMaterial
-      );
-      backWall.position.z = -this.dioramaDepth;
-      
-      const floor = new THREE.Mesh(
-        new THREE.BoxGeometry(8, 0.5, this.dioramaDepth * 2),
-        wallMaterial
-      );
-      floor.position.y = -4;
-      floor.position.z = -this.dioramaDepth/2;
-      
-      const leftWall = new THREE.Mesh(
-        new THREE.BoxGeometry(0.5, 8, this.dioramaDepth * 2),
-        wallMaterial
-      );
-      leftWall.position.x = -4;
-      leftWall.position.z = -this.dioramaDepth/2;
-      
-      roomContainer.add(backWall, floor, leftWall);
-    }
-    
-    // Add the room container to the diorama
-    diorama.add(roomContainer);
-    
-    // Position the entire diorama
-    diorama.position.y = yPosition;
-    diorama.rotation.y = Math.PI * -0.25;
-    
-    // Create diorama data object
-    const dioramaData = {
-      mesh: diorama,
-      yPosition: yPosition,
-      index: index,
-      roomContainer,
-      posts: []
-    };
-    
-    // Add to dioramas group
-    this.dioramas.add(diorama);
-    
-    // Initialize userData if it doesn't exist
-    diorama.userData = diorama.userData || {};
-    diorama.userData.posts = [];
-    
-    this.visibleDioramas.push(dioramaData);
-    return dioramaData;
-  }
-
-  setupScrolling() {
-    // Remove any existing scroll listeners
-    window.removeEventListener('wheel', this.handleScroll);
-    // Add new scroll listener with passive: false to allow preventDefault
-    window.addEventListener('wheel', this.handleScroll, { passive: false });
-    
-    // Prevent default document scrolling
-    document.body.style.overflow = 'hidden';
-  }
-
-  handleScroll(event) {
-    // Always prevent default scroll behavior
-    event.preventDefault();
-    
-    if (!this.isActive) return;
-    
-    const scrollSpeed = 0.02;
-    const previousScrollPosition = this.scrollPosition;
-    this.scrollPosition += event.deltaY * scrollSpeed;
-    
-    // Clamp scroll position to prevent extreme values
-    this.scrollPosition = Math.max(-1000, Math.min(1000, this.scrollPosition));
-    
-    // Only update connections if scroll position has changed significantly
-    const scrollDelta = Math.abs(previousScrollPosition - this.scrollPosition);
-    const needsConnectionUpdate = scrollDelta > 0.1;
-    
-    // Update dioramas position
-    this.dioramas.position.y = -this.scrollPosition;
-    
-    // Check if we need to create new dioramas
-    const lowestDiorama = Math.min(...this.visibleDioramas.map(d => d.yPosition));
-    const highestDiorama = Math.max(...this.visibleDioramas.map(d => d.yPosition));
-    const lowestIndex = Math.min(...this.visibleDioramas.map(d => d.index));
-    const highestIndex = Math.max(...this.visibleDioramas.map(d => d.index));
-    
-    // Create new dioramas above
-    if (this.scrollPosition - this.dioramaHeight < lowestDiorama) {
-      this.createDiorama(lowestDiorama - (this.dioramaHeight + this.dioramaGap), lowestIndex - 1);
-    }
-    
-    // Create new dioramas below
-    if (this.scrollPosition + this.dioramaHeight > highestDiorama) {
-      this.createDiorama(highestDiorama + (this.dioramaHeight + this.dioramaGap), highestIndex + 1);
-    }
-    
-    // Hide/show dioramas based on distance instead of removing them
-    const hideThreshold = this.dioramaHeight * 3;
-    this.visibleDioramas.forEach(diorama => {
-      const distance = Math.abs(diorama.yPosition - this.scrollPosition);
-      const shouldBeVisible = distance <= hideThreshold;
-      
-      // Only toggle visibility if it's different from current state
-      if (diorama.mesh.visible !== shouldBeVisible) {
-        diorama.mesh.visible = shouldBeVisible;
-        
-        // Also toggle visibility of all children (including characters)
-        diorama.mesh.traverse(child => {
-          if (child instanceof THREE.Mesh) {
-            child.visible = shouldBeVisible;
-          }
-        });
-      }
-    });
-    
-    // Update existing permanent connections when scrolling significantly
-    if (needsConnectionUpdate) {
-      this.updateAllPermanentConnections();
-    }
-  }
-
-  hide() {
-    console.log('Hiding Home page');
-    this.isActive = false;
-    this.scene.remove(this.dioramas);
-    this.scene.remove(this.posts);
-    
-    // Remove stars
-    if (this.stars) {
-      this.scene.remove(this.stars);
-      this.stars.geometry.dispose();
-      this.stars.material.dispose();
-      this.stars = null;
-    }
-    
-    // Clean up event listeners
-    this.cleanupEventListeners();
-    
-    // Reset event handling flags so they can be set up fresh next time
-    this.postButtonHandlersInitialized = false;
-  }
-
-  update() {
-    if (!this.isActive) return;
-
-    // Update all dioramas
-    this.dioramas.children.forEach(diorama => {
-      if (diorama.update) diorama.update();
-      
-      // Update animations if they exist
-      if (diorama.userData.mixer) {
-        diorama.userData.mixer.update(0.016); // Assuming 60fps
-      }
-    });
-    
-    // Update all posts
-    this.posts.children.forEach(post => {
-      if (post.update) post.update();
-    });
-  }
-
-  setupPostCanvas() {
-    // Create canvas overlay for posts
-    this.postCanvas = document.createElement('canvas');
-    this.postCanvas.style.position = 'fixed';
-    this.postCanvas.style.top = '0';
-    this.postCanvas.style.left = '0';
-    this.postCanvas.style.width = '100%';
-    this.postCanvas.style.height = '100%';
-    this.postCanvas.style.pointerEvents = 'none';
-    this.postCanvas.style.zIndex = '2';
-    document.body.appendChild(this.postCanvas);
-    
-    // Set canvas size
-    this.resizeCanvas();
-    window.addEventListener('resize', () => this.resizeCanvas());
-  }
-
-  resizeCanvas() {
-    if (this.postCanvas) {
-      this.postCanvas.width = window.innerWidth;
-      this.postCanvas.height = window.innerHeight;
-    }
-  }
-
-  setupPostCreation() {
-    // Check if we've already set up post handlers
-    if (this.postButtonHandlersInitialized) {
-      console.log('Post creation handlers already initialized, skipping');
-      return;
-    }
-  
-    // Get elements
-    const createPostButton = document.getElementById('create-post');
-    const postInput = document.getElementById('post-input');
-    
-    if (!createPostButton || !postInput) {
-      console.log('Post creation UI elements not found');
-      return;
-    }
-    
-    // First remove any existing event listeners by cloning and replacing elements
-    const newButton = createPostButton.cloneNode(true);
-    createPostButton.parentNode.replaceChild(newButton, createPostButton);
-    
-    const newInput = postInput.cloneNode(true);
-    postInput.parentNode.replaceChild(newInput, postInput);
-    
-    // Now use the new elements for our setup
-    const postSubmitHandler = async () => {
-      // If button is disabled, do nothing (prevents duplicate submissions)
-      if (newButton.disabled) return;
-      
-      const content = newInput.value.trim();
-      if (!content) return;
-      
-      // Disable UI during submission
-      newButton.disabled = true;
-      newButton.textContent = 'Posting...';
-      console.log('Creating post:', content);
-      
-      try {
-        const success = await this.createPost(content);
-        if (success) {
-          newInput.value = '';
-        }
-      } catch (error) {
-        console.error('Error in post submission:', error);
-      } finally {
-        // Re-enable UI
-        newButton.disabled = false;
-        newButton.textContent = 'Post';
-      }
-    };
-    
-    // Set up click handler
-    newButton.addEventListener('click', (event) => {
-      event.preventDefault();
-      postSubmitHandler();
-    });
-    
-    // Set up enter key handler
-    newInput.addEventListener('keypress', (event) => {
-      if (event.key === 'Enter' && !event.shiftKey) {
-        event.preventDefault();
-        postSubmitHandler();
-      }
-    });
-    
-    // Mark post handlers as initialized
-    this.postButtonHandlersInitialized = true;
-    console.log('Post creation event handlers set up');
-  }
-
-  async createPost(content) {
-    if (!this.currentUser) {
-      console.error('Cannot create post: User not logged in.');
-      return;
-    }
-
-    const postData = {
-      content: content,
-      userId: this.currentUser._id,
-      username: this.currentUser.username,
-    };
-
-    try {
-      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/posts`, 'POST', postData);
-      const newPost = await response.json();
-      if (newPost) {
-        console.log('Post created:', newPost);
-        // Add new post to the user's posts
-        const currentPosts = this.userPosts.get(this.currentUser._id) || [];
-        this.userPosts.set(this.currentUser._id, [newPost, ...currentPosts]);
-        this.createVisualPost(newPost, this.dioramas.children[this.userDioramaIndex]);
-      }
-    } catch (error) {
-      console.error('Error creating post:', error);
-    }
-  }
-
-  createVisualPost(post, userDiorama) {
-    if (!post || !post.content) {
-      console.error('Invalid post data:', post);
-      return;
-    }
-
-    console.log('Creating visual post with data:', post);
-    
-    // Check if post already exists in this diorama
-    if (userDiorama.mesh.userData.posts) {
-      const existingPost = userDiorama.mesh.userData.posts.find(p => p.postId === post._id);
-      if (existingPost) {
-        console.log('Post already exists in diorama, not creating duplicate:', post._id);
-        return;
-      }
-    } else {
-      userDiorama.mesh.userData.posts = [];
-    }
-
-    // Create canvas and context
-    const canvas = document.createElement('canvas');
-    const ctx = canvas.getContext('2d');
-    canvas.width = 512;
-    canvas.height = 256;
-
-    // Style the text panel
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
-    
-    ctx.strokeStyle = '#4a90e2';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-
-    // Style and add text
-    ctx.fillStyle = 'white';
-    ctx.font = '32px Roboto';
-    
-    // Word wrap
-    const words = post.content.split(' ');
-    let line = '';
-    let y = 50;
-    const maxWidth = canvas.width - 40;
-    
-    words.forEach(word => {
-      const testLine = line + word + ' ';
-      const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth) {
-        ctx.fillText(line, 20, y);
-        line = word + ' ';
-        y += 40;
-      } else {
-        line = testLine;
-      }
-    });
-    ctx.fillText(line, 20, y);
-
-    // Create texture
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.needsUpdate = true;
-
-    // Create post mesh
-    const geometry = new THREE.PlaneGeometry(1.5, 0.75);
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.9
-    });
-
-    const postMesh = new THREE.Mesh(geometry, material);
-    
-    // Calculate grid position
-    const postsCount = userDiorama.mesh.userData.posts.length;
-    const gridCols = 4;
-    const gridX = postsCount % gridCols;
-    const gridY = Math.floor(postsCount / gridCols);
-    
-    // Position on wall
-    postMesh.position.set(
-      -3 + (gridX * 1.7),
-      2 - (gridY * 0.95),
-      -this.dioramaDepth + 0.3
-    );
-    
-    // Determine the post author - check if author is an object with _id property
-    let authorId;
-    if (post.author && typeof post.author === 'object' && post.author._id) {
-      // MongoDB populated author object
-      authorId = post.author._id;
-    } else if (post.author && typeof post.author === 'string') {
-      // Author as string ID
-      authorId = post.author;
-    } else {
-      // Fallback to other potential sources
-      authorId = post.authorId || post.userId || userDiorama.mesh.userData.userId;
-    }
-    
-    console.log('Determined authorId for post:', {
-      authorId,
-      originalAuthor: post.author,
-      authorType: typeof post.author
-    });
-    
-    // Find the author username - try different possible locations
-    let authorUsername = null;
-    // Check if username is directly in the post data
-    if (post.authorName || post.username) {
-      authorUsername = post.authorName || post.username;
-    } 
-    // Try to find in allUsers
-    else {
-      const authorUser = this.allUsers.find(user => user._id === authorId);
-      if (authorUser) {
-        authorUsername = authorUser.username;
-      }
-      // Check if diorama has the username
-      else if (userDiorama.mesh.userData.username) {
-        authorUsername = userDiorama.mesh.userData.username;
-      }
-      // Last resort: try currentUser
-      else {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        if (currentUser && currentUser._id === authorId) {
-          authorUsername = currentUser.username;
-        }
-      }
-    }
-    
-    // Store post data
-    postMesh.userData.originalPosition = postMesh.position.clone();
-    postMesh.userData.originalScale = postMesh.scale.clone();
-    postMesh.userData.originalRotation = postMesh.rotation.clone();
-    postMesh.userData.content = post.content;
-    postMesh.userData.isPost = true;
-    postMesh.userData.postId = post._id;
-    postMesh.userData.authorId = authorId;
-    postMesh.userData.authorUsername = authorUsername;
-    postMesh.userData.createdAt = post.createdAt; // Store the creation date
-    postMesh.userData.reactions = post.reactions || [];
-
-    // Store post data in diorama
-    userDiorama.mesh.userData.posts.push({
-      mesh: postMesh,
-      content: post.content,
-      timestamp: post.createdAt,
-      postId: post._id,
-      authorId: authorId,
-      authorUsername: authorUsername,
-      reactions: post.reactions || []
-    });
-    
-    console.log(`Added post to diorama for ${authorUsername || 'Unknown User'}, total posts: ${userDiorama.mesh.userData.posts.length}`);
-    
-    // Add to scene
-    userDiorama.mesh.add(postMesh);
-  }
-
-  setupEventListeners() {
-    // Add event listeners
-    window.addEventListener('mousemove', this.handleMouseMoveBound);
-    window.addEventListener('mousedown', this.handleMouseDownBound);
-    window.addEventListener('mouseup', this.handleMouseUpBound);
-    window.addEventListener('click', this.handleClickBound);
-    
-    // Add resize event listener to update connections
-    window.addEventListener('resize', this.handleResizeBound);
-    
-    // Wheel event for scrolling
-    window.addEventListener('wheel', this.handleScrollBound, { passive: false });
-  }
-
-  cleanupEventListeners() {
-    // Remove event listeners
-    window.removeEventListener('mousemove', this.handleMouseMoveBound);
-    window.removeEventListener('mousedown', this.handleMouseDownBound);
-    window.removeEventListener('mouseup', this.handleMouseUpBound);
-    window.removeEventListener('click', this.handleClickBound);
-    
-    // Remove the resize event listener
-    window.removeEventListener('resize', this.handleResizeBound);
-    
-    // Wheel event for scrolling
-    window.removeEventListener('wheel', this.handleScrollBound, { passive: false });
-  }
-
-  handleMouseMove(event) {
-    if (!this.isActive) return;
-
-    // Update mouse position
-    this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
-    this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-
-    // Update raycaster
-    this.raycaster.setFromCamera(this.mouse, this.camera);
-
-    // If we're in diorama editing mode
-    if (this.dioramaEditing.isActive) {
-      // Get all furniture objects from visible dioramas
-      const furnitureObjects = [];
-      this.visibleDioramas.forEach(diorama => {
-        diorama.mesh.traverse(child => {
-          if (child.userData && child.userData.isFurniture) {
-            furnitureObjects.push(child);
-          }
-        });
-      });
-
-      // Find intersections with furniture
-      const intersects = this.raycaster.intersectObjects(furnitureObjects, true);
-
-      if (intersects.length > 0) {
-        const object = intersects[0].object;
-        
-        // If we're not already hovering this object
-        if (this.dioramaEditing.hoveredObject !== object) {
-          // Clear previous hover
-          if (this.dioramaEditing.hoveredObject) {
-            this.dioramaEditing.hoveredObject.material = this.dioramaEditing.originalMaterials.get(this.dioramaEditing.hoveredObject);
-          }
-          
-          // Set new hover
-          this.dioramaEditing.hoveredObject = object;
-          this.dioramaEditing.originalMaterials.set(object, object.material);
-          object.material = this.dioramaEditing.hoverMaterial.clone();
-          
-          // Change cursor
-          document.body.style.cursor = 'pointer';
-        }
-      } else {
-        // Clear hover if mouse is not over any furniture
-        if (this.dioramaEditing.hoveredObject) {
-          this.dioramaEditing.hoveredObject.material = this.dioramaEditing.originalMaterials.get(this.dioramaEditing.hoveredObject);
-          this.dioramaEditing.hoveredObject = null;
-          document.body.style.cursor = 'default';
-        }
-      }
-    }
-
-    // Handle existing cord system
-    if (this.cordSystem.isDragging && this.cordSystem.cord) {
-      // ... existing cord system code ...
-    }
-  }
-
-  handleMouseDown(event) {
-    if (!this.isActive) return;
-
-    // Get mouse coordinates
-    const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-    const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    // Update raycaster
-    this.raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), this.camera);
-    
-    // If we're in diorama editing mode
-    if (this.dioramaEditing.isActive) {
-      // Get all furniture objects from visible dioramas
-      const furnitureObjects = [];
-      this.visibleDioramas.forEach(diorama => {
-        diorama.mesh.traverse(child => {
-          if (child.userData && child.userData.isFurniture) {
-            furnitureObjects.push(child);
-          }
-        });
-      });
-
-      // Find intersections with furniture
-      const intersects = this.raycaster.intersectObjects(furnitureObjects, true);
-
-      if (intersects.length > 0) {
-        const object = intersects[0].object;
-        
-        // Check if this is the user's diorama
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const diorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
-        
-        if (diorama && object.parent === diorama.mesh) {
-          // Handle object selection
-          this.handleObjectSelection(object);
-          
-          // Start drag if object is already selected
-          if (this.dioramaEditing.selectedObject === object) {
-            this.startObjectDrag(event);
-          }
-        } else {
-          this.showNotification('You can only edit objects in your own diorama', 'warning');
-        }
-      }
-    }
-
-    // Handle existing cord system
-    if (!this.dioramaEditing.isActive) {
-      // ... existing cord system code ...
-    }
-  }
-
-  handleMouseUp(event) {
-    if (!this.isActive || !this.cordSystem.isDragging) return;
-    
-    // Stop dragging
-    this.cordSystem.isDragging = false;
-    
-    // Check if we're hovering over a valid target diorama
-    if (this.cordSystem.currentHover && 
-        this.cordSystem.currentHover !== this.cordSystem.sourceDiorama) {
-      // Find the target diorama data
-      const targetDiorama = this.visibleDioramas.find(d => d.mesh === this.cordSystem.currentHover);
-      
-      // Always get the current user's diorama as the source
-      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-      const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
-      
-      if (targetDiorama && userDiorama) {
-        // Anchor the diorama directly from user's diorama to target
-        this.anchorDiorama(userDiorama, targetDiorama);
-      }
-    } else {
-      // No valid target, remove the cord
-      if (this.cordSystem.cord) {
-        this.scene.remove(this.cordSystem.cord);
-        this.cordSystem.cord = null;
-      }
-    }
-    
-    // Clear any highlight
-    if (this.cordSystem.currentHover) {
-      this.cordSystem.currentHover.traverse(child => {
-        if (child.material && child.material.emissive) {
-          child.material.emissive.setRGB(0, 0, 0);
-        }
-      });
-      this.cordSystem.currentHover = null;
-    }
-    
-    // Reset cord system
-    this.cordSystem.isActive = false;
-    this.cordSystem.sourceDiorama = null;
-    
-    // Re-enable scrolling
-    document.body.style.overflow = 'auto';
-  }
-
-  // Add the createCord method
-  createCord() {
-    // Find the connector object in the source diorama
-    const connector = this.cordSystem.sourceDiorama.children.find(child => 
-      child.userData && child.userData.isConnector
-    );
-    
-    if (!connector) return;
-    
-    // Get world position of the connector
-    const startPoint = new THREE.Vector3();
-    connector.getWorldPosition(startPoint);
-    
-    // Create a curve from the connector to the drag point
-    const curve = new THREE.CatmullRomCurve3([
-      startPoint,
-      this.cordSystem.dragPoint
-    ]);
-    
-    // Create geometry from the curve
-    const points = curve.getPoints(50);
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    
-    // Create material
-    const material = new THREE.LineBasicMaterial({
-      color: 0x4a90e2,
-      linewidth: 3
-    });
-    
-    // Create the line
-    const cord = new THREE.Line(geometry, material);
-    this.cordSystem.cord = cord;
-    
-    // Add to scene
-    this.scene.add(cord);
-  }
-
-  // Add the updateCord method
-  updateCord() {
-    if (!this.cordSystem.cord || !this.cordSystem.sourceDiorama) return;
-    
-    // Find the connector object in the source diorama
-    const connector = this.cordSystem.sourceDiorama.children.find(child => 
-      child.userData && child.userData.isConnector
-    );
-    
-    if (!connector) return;
-    
-    // Get world position of the connector
-    const startPoint = new THREE.Vector3();
-    connector.getWorldPosition(startPoint);
-    
-    // Create a curved path with control points
-    const midPoint = new THREE.Vector3().addVectors(startPoint, this.cordSystem.dragPoint).multiplyScalar(0.5);
-    midPoint.y += 2; // Add some height to the middle for a nice curve
-    
-    const curve = new THREE.CubicBezierCurve3(
-      startPoint,
-      new THREE.Vector3(startPoint.x + 1, startPoint.y + 2, startPoint.z),
-      new THREE.Vector3(this.cordSystem.dragPoint.x - 1, this.cordSystem.dragPoint.y + 2, this.cordSystem.dragPoint.z),
-      this.cordSystem.dragPoint
-    );
-    
-    // Get points from the curve
-    const points = curve.getPoints(50);
-    
-    // Update cord geometry
-    this.cordSystem.cord.geometry.dispose();
-    this.cordSystem.cord.geometry = new THREE.BufferGeometry().setFromPoints(points);
-  }
-
-  // Add the anchorDiorama method
-  anchorDiorama(sourceDiorama, targetDiorama) {
-    console.log(`Anchoring diorama ${targetDiorama.index} to ${sourceDiorama.index}`);
-    
-    // Get the user diorama to ensure we're always using the user's diorama
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
-    
-    if (!userDiorama) {
-      console.error('User diorama not found');
-      return;
-    }
-    
-    // Always use the user's diorama as the source, regardless of which diorama initiated the link
-    sourceDiorama = userDiorama;
-    
-    // Calculate new position for target diorama (to the right of the user diorama)
-    const userPosition = userDiorama.mesh.position.clone();
-    
-    // Check how many dioramas are already anchored
-    const anchoredCount = this.cordSystem.anchored.size;
-    
-    // Position to the right with offset based on how many are already anchored
-    // Using smaller spacing (12) for the initial offset
-    const newPosition = new THREE.Vector3(
-      userPosition.x + 12 + (anchoredCount * 14), 
-      userPosition.y,
-      userPosition.z
-    );
-    
-    // Store original position for later
-    const originalPosition = targetDiorama.mesh.position.clone();
-    
-    // Add to anchored map
-    this.cordSystem.anchored.set(targetDiorama.index, {
-      diorama: targetDiorama,
-      originalPosition
-    });
-    
-    // Animate the diorama to the new position
-    this.animateDioramaMove(targetDiorama, originalPosition, newPosition);
-    
-    // Create permanent connection cord (but don't display it initially)
-    this.createPermanentConnection(userDiorama, targetDiorama, newPosition);
-    
-    // Update the timeline positions to fill any gaps
-    this.updateTimelinePositions();
-    
-    // Remove the temporary cord
-    if (this.cordSystem.cord) {
-      this.scene.remove(this.cordSystem.cord);
-      this.cordSystem.cord = null;
-    }
-  }
-
-  // Add the animateDioramaMove method
-  animateDioramaMove(diorama, startPosition, endPosition) {
-    // Animate the diorama movement with easing
-    const duration = 1.0; // seconds
-    const startTime = Date.now();
-    
-    const animate = () => {
-      if (!this.isActive) return;
-      
-      const elapsed = (Date.now() - startTime) / 1000;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Use easing function for smooth animation
-      const easeProgress = 1 - Math.pow(1 - progress, 4); // Quartic ease out
-      
-      // Interpolate position
-      diorama.mesh.position.lerpVectors(startPosition, endPosition, easeProgress);
-      
-      // Update connections during animation for smoother movement
-      if (progress % 0.1 < 0.01) { // Update at 10% intervals to avoid performance issues
-        this.updateAllPermanentConnections();
-      }
-      
-      // Continue animation if not complete
-      if (progress < 1) {
-        requestAnimationFrame(animate);
-      } else {
-        // Animation complete, set final position
-        diorama.mesh.position.copy(endPosition);
-        
-        // Update the diorama's stored position
-        diorama.yPosition = endPosition.y;
-        
-        // Final update of all connections
-        this.updateAllPermanentConnections();
-        
-        // Play a sound effect
-        const anchorSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2005/2005-preview.mp3');
-        anchorSound.volume = 0.3;
-        anchorSound.play().catch(e => console.log('Error playing anchor sound:', e));
-        
-        // Show a notification
-        this.showNotification('Diorama linked successfully!', 'success');
-      }
-    };
-    
-    // Start animation
-    animate();
-  }
-
-  handleClick(event) {
-    if (!this.isActive) return;
-    
-    // Skip if we're currently dragging a cord
-    if (this.cordSystem.isDragging) return;
-    
-    // Get mouse coordinates
-    const mouseX = (event.clientX / window.innerWidth) * 2 - 1;
-    const mouseY = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    // Update raycaster
-    this.raycaster.setFromCamera(new THREE.Vector2(mouseX, mouseY), this.camera);
-    
-    // Find all interactive objects
-    const allInteractiveObjects = [];
-    
-    // Add all posts, characters, and furniture objects
-    this.visibleDioramas.forEach(diorama => {
-      diorama.mesh.traverse(child => {
-        if (child.userData && (
-          child.userData.isPost ||
-          child.userData.isCharacter ||
-          child.userData.isFurniture
-        )) {
-          allInteractiveObjects.push(child);
-        }
-      });
-    });
-    
-    // Add all connection cords
-    const connectionCords = this.scene.children.filter(child => 
-      child.userData && child.userData.isPermanentConnection
-    );
-    allInteractiveObjects.push(...connectionCords);
-    
-    // Find intersections
-    const intersects = this.raycaster.intersectObjects(allInteractiveObjects, true);
-
-    if (intersects.length > 0) {
-      // Find the appropriate top-level object
-      let clickedObject = intersects[0].object;
-      
-      // Handle case where we hit a part of the model, not the top level object
-      while (clickedObject.parent && !(clickedObject.parent instanceof THREE.Scene)) {
-        if (clickedObject.userData && (
-          clickedObject.userData.isPost ||
-          clickedObject.userData.isCharacter ||
-          clickedObject.userData.isFurniture ||
-          clickedObject.userData.isPermanentConnection
-        )) {
-          break;
-        }
-        clickedObject = clickedObject.parent;
-      }
-      
-      // Handle different types of objects
-      if (clickedObject.userData.isFurniture && this.dioramaEditing.isActive) {
-        this.handleObjectSelection(clickedObject);
-      } else if (clickedObject.userData.isPost) {
-        // Existing post handling code
-        const clickedPost = clickedObject;
-        this.reactionSound.currentTime = 0;
-        this.reactionSound.play().catch(e => console.log('Error playing reaction sound:', e));
-        
-        clickedPost.userData.isClicked = true;
-        this.createPostPopup(clickedPost);
-      } else if (clickedObject.userData.isCharacter) {
-        // Existing character handling code
-        const clickedCharacter = clickedObject;
-        if (clickedCharacter.userData.isSelected) return;
-        
-        const diorama = this.visibleDioramas.find(d => d.mesh.children.includes(clickedCharacter));
-        if (diorama) {
-          const userName = this.getUserNameFromId(diorama.mesh.userData.userId) || 'Unknown User';
-          this.createCharacterPopup(clickedCharacter, userName, diorama.mesh.userData.userId);
-        }
-      } else if (clickedObject.userData.isPermanentConnection) {
-        // Existing connection handling code
-        const targetDioramaIndex = clickedObject.userData.targetDioramaIndex;
-        if (confirm('Do you want to unlink this diorama?')) {
-          const targetDiorama = this.visibleDioramas.find(d => d.index === targetDioramaIndex);
-          this.unlinkDiorama(targetDiorama);
-        }
-      }
-    }
-  }
-
-  createPostPopup(postMesh) {
-    // Get post data from mesh
-    const postContent = postMesh.userData.content;
-    const postId = postMesh.userData.postId;
-    const authorId = postMesh.userData.authorId;
-    
-    console.log('Post popup data:', {
-      postId,
-      authorId,
-      postContent: postContent.substring(0, 20) + (postContent.length > 20 ? '...' : '')
-    });
-    
-    // Create popup HTML
-    const popupContainer = document.createElement('div');
-    popupContainer.id = 'post-popup';
-    popupContainer.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: transparent;
-      padding: 0;
-      max-width: 80%;
-      width: 400px;
-      color: white;
-      z-index: 1000;
-    `;
-    
-    // Create inner container with border and transparency like on notifications page
-    const innerContainer = document.createElement('div');
-    innerContainer.className = 'post-popup-inner';
-    innerContainer.style.cssText = `
-      background-color: transparent;
-      backdrop-filter: none;
-      border-radius: 15px;
-      padding: 20px;
-      border: 2px solid #4a90e2;
-      box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
-    `;
-    
-    // Create content
-    const popupContent = document.createElement('div');
-    popupContent.id = 'post-popup-content';
-    popupContent.textContent = postContent;
-    popupContent.style.cssText = `
-      margin-bottom: 15px;
-      font-size: 18px;
-      overflow-wrap: break-word;
-    `;
-    
-    // Get the username for this post
-    const username = this.getUserNameFromId(authorId) || 'Unknown User';
-    
-    // Create author element
-    const authorElement = document.createElement('div');
-    authorElement.classList.add('post-author');
-    authorElement.textContent = `Posted by: ${username}`;
-    authorElement.style.cssText = `
-      font-size: 14px;
-      color: #4a90e2;
-      margin-bottom: 10px;
-      font-style: italic;
-    `;
-    
-    // Create reaction buttons
-    const reactionBar = document.createElement('div');
-    reactionBar.classList.add('reaction-bar');
-    reactionBar.style.cssText = `
-      display: flex;
-      justify-content: center;
-      gap: 10px;
-      margin-top: 15px;
-    `;
-    
-    // Get the current user ID
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    const currentUserId = currentUser?._id;
-    
-    console.log('User comparison for delete button:', {
-      currentUserId,
-      authorId,
-      isMatch: currentUserId === authorId,
-      currentUserType: typeof currentUserId,
-      authorIdType: typeof authorId
-    });
-    
-    // Create delete button (only if current user is author)
-    let deleteButton = null;
-    if (currentUserId && authorId && 
-        (currentUserId === authorId || currentUserId.toString() === authorId.toString())) {
-      deleteButton = document.createElement('button');
-      deleteButton.textContent = 'Delete Post';
-      deleteButton.classList.add('delete-button');
-      deleteButton.style.cssText = `
-        margin-top: 15px;
-        padding: 8px 15px;
-        background-color: rgba(230, 57, 70, 0.8);
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        transition: background-color 0.2s;
-      `;
-      
-      // Hover effect
-      deleteButton.addEventListener('mouseover', () => {
-        deleteButton.style.backgroundColor = 'rgba(193, 18, 31, 0.8)';
-      });
-      
-      deleteButton.addEventListener('mouseout', () => {
-        deleteButton.style.backgroundColor = 'rgba(230, 57, 70, 0.8)';
-      });
-      
-      // Handle delete click
-      deleteButton.addEventListener('click', async () => {
-        // Ask for confirmation
-        if (confirm('Are you sure you want to delete this post?')) {
-          await this.deletePost(postId, postMesh);
-        }
-      });
-    }
-    
-    // Add reaction buttons
-    Object.keys(this.REACTION_TYPES).forEach(emoji => {
-      const button = document.createElement('button');
-      button.textContent = emoji;
-      button.style.cssText = `
-        font-size: 20px;
-        background: none;
-        border: none;
-        cursor: pointer;
-        padding: 5px;
-        transition: transform 0.2s;
-      `;
-      
-      // Add hover effect
-      button.addEventListener('mouseover', () => {
-        button.style.transform = 'scale(1.2)';
-      });
-      
-      button.addEventListener('mouseout', () => {
-        button.style.transform = 'scale(1)';
-      });
-      
-      // Handle reaction click
-      button.addEventListener('click', () => {
-        this.handleReaction(postId, emoji);
-      });
-      
-      reactionBar.appendChild(button);
-    });
-    
-    // Create close button
-    const closeButton = document.createElement('button');
-    closeButton.textContent = '×';
-    closeButton.style.cssText = `
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: none;
-      border: none;
-      color: white;
-      font-size: 24px;
-      cursor: pointer;
-      z-index: 1001;
-    `;
-    
-    // Add elements to inner container
-    innerContainer.appendChild(authorElement);
-    innerContainer.appendChild(popupContent);
-    innerContainer.appendChild(reactionBar);
-    
-    // Add delete button if current user is author
-    if (deleteButton) {
-      innerContainer.appendChild(deleteButton);
-    }
-    
-    // Update reaction counts if available
-    if (postMesh.userData.reactions) {
-      this.updateReactionCounts(postMesh.userData.reactions, innerContainer);
-    }
-    
-    // Add inner container to popup container
-    popupContainer.appendChild(innerContainer);
-    popupContainer.appendChild(closeButton);
-    
-    // Add to body
-    document.body.appendChild(popupContainer);
-    
-    // Handle close button click
-    const closePopup = (e) => {
-      e.preventDefault();
-      document.body.removeChild(popupContainer);
-      document.removeEventListener('keydown', escapeClose);
-      
-      // Reset clicked state
-      postMesh.userData.isClicked = false;
-    };
-    
-    closeButton.addEventListener('click', closePopup);
-    
-    // Close on ESC key
-    const escapeClose = (e) => {
-      if (e.key === 'Escape') {
-        closePopup(e);
-      }
-    };
-    
-    document.addEventListener('keydown', escapeClose);
-  }
-  
-  // Add createCharacterPopup method
-  createCharacterPopup(character, userName, userId) {
-    // Create popup for character info
-    const popupContainer = document.createElement('div');
-    popupContainer.id = 'character-popup';
-    popupContainer.style.cssText = `
-      position: fixed;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      background-color: transparent;
-      padding: 0;
-      max-width: 80%;
-      width: 400px;
-      color: white;
-      z-index: 1000;
-    `;
-    
-    // Create inner container with border and transparency like on notifications page
-    const innerContainer = document.createElement('div');
-    innerContainer.className = 'character-popup-inner';
-    innerContainer.style.cssText = `
-      background-color: transparent;
-      backdrop-filter: none;
-      border-radius: 15px;
-      padding: 20px;
-      border: 2px solid #4a90e2;
-      box-shadow: 0 4px 12px rgba(74, 144, 226, 0.3);
-    `;
-    
-    // Add username
-    const usernameElement = document.createElement('h2');
-    usernameElement.textContent = userName;
-    usernameElement.style.cssText = `
-      color: #4a90e2;
-      margin-bottom: 15px;
-      font-size: 24px;
-      text-shadow: 0 0 15px rgba(74, 144, 226, 0.5);
-    `;
-    
-    // Create confetti at character's position
-    this.createConfetti(character.position);
-    
-    // Set character as selected
-    character.userData.isSelected = true;
-    
-    // Get user bio if available
-    const userBio = this.getUserBio(userId);
-    
-    // Add bio
-    const bioElement = document.createElement('p');
-    bioElement.textContent = userBio || "This user hasn't written a bio yet.";
-    bioElement.style.cssText = `
-      margin-bottom: 20px;
-      line-height: 1.5;
-    `;
-    
-    // Create close button
-    const closeButton = document.createElement('button');
-    closeButton.textContent = '×';
-    closeButton.style.cssText = `
-      position: absolute;
-      top: 10px;
-      right: 10px;
-      background: none;
-      border: none;
-      color: white;
-      font-size: 24px;
-      cursor: pointer;
-      z-index: 1001;
-    `;
-    
-    // Add edit button if this is the current user
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    if (currentUser && currentUser._id === userId) {
-      const editButton = document.createElement('button');
-      editButton.textContent = 'Edit Character';
-      editButton.style.cssText = `
-        padding: 8px 15px;
-        background-color: rgba(74, 144, 226, 0.8);
-        color: white;
-        border: none;
-        border-radius: 5px;
-        cursor: pointer;
-        font-weight: bold;
-        width: 100%;
-        transition: background-color 0.2s;
-      `;
-      
-      // Hover effect
-      editButton.addEventListener('mouseover', () => {
-        editButton.style.backgroundColor = 'rgba(53, 122, 189, 0.8)';
-      });
-      
-      editButton.addEventListener('mouseout', () => {
-        editButton.style.backgroundColor = 'rgba(74, 144, 226, 0.8)';
-      });
-      
-      // Redirect to character page on click
-      editButton.addEventListener('click', () => {
-        window.location.href = 'character.html';
-      });
-      
-      innerContainer.appendChild(editButton);
-    }
-    
-    // Add elements to inner container
-    innerContainer.appendChild(usernameElement);
-    innerContainer.appendChild(bioElement);
-    
-    // Add inner container to popup container
-    popupContainer.appendChild(innerContainer);
-    popupContainer.appendChild(closeButton);
-    
-    // Add to body
-    document.body.appendChild(popupContainer);
-    
-    // Handle close button click
-    const closePopup = (e) => {
-      e.preventDefault();
-      document.body.removeChild(popupContainer);
-      document.removeEventListener('keydown', escapeClose);
-      
-      // Reset character selection
-      character.userData.isSelected = false;
-    };
-    
-    closeButton.addEventListener('click', closePopup);
-    
-    // Close on ESC key
-    const escapeClose = (e) => {
-      if (e.key === 'Escape') {
-        closePopup(e);
-      }
-    };
-    
-    document.addEventListener('keydown', escapeClose);
-  }
-  
-  // Helper method to get user bio
-  getUserBio(userId) {
-    const user = this.allUsers.find(user => user._id === userId);
-    if (user) {
-      if (user.character && user.character.bio) {
-        return user.character.bio;
-      }
-      return user.bio || '';
-    }
-    return '';
-  }
-  
-  // Improved getUserNameFromId method to be more robust
-  getUserNameFromId(userId) {
-    if (!userId) return 'Unknown User';
-    
-    // First check allUsers array
-    const user = this.allUsers.find(user => user._id === userId);
-    if (user && user.username) {
-      return user.username;
-    }
-    
-    // If not found, check if it's the current user
-    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-    if (currentUser && currentUser._id === userId && currentUser.username) {
-      return currentUser.username;
-    }
-    
-    // Try to find the diorama with this userId to get the username
-    const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === userId);
-    if (userDiorama && userDiorama.mesh.userData.username) {
-      return userDiorama.mesh.userData.username;
-    }
-    
-    // Try to find any post from this user that might have the username
-    let username = null;
-    this.visibleDioramas.forEach(diorama => {
-      if (username) return; // Skip if already found
-      
-      if (diorama.mesh.userData.posts) {
-        const userPost = diorama.mesh.userData.posts.find(p => p.authorId === userId);
-        if (userPost && userPost.authorUsername) {
-          username = userPost.authorUsername;
-        }
-      }
-    });
-    
-    if (username) {
-      return username;
-    }
-    
-    // Check userPosts map for posts that might have author info
-    if (this.userPosts.has(userId)) {
-      const posts = this.userPosts.get(userId);
-      if (posts && posts.length > 0 && posts[0].authorName) {
-        return posts[0].authorName;
-      }
-    }
-    
-    // Last resort: Check all userPosts for any post by this author
-    for (const [_, posts] of this.userPosts.entries()) {
-      for (const post of posts) {
-        if ((post.author === userId || post.authorId === userId) && post.authorName) {
-          return post.authorName;
-        }
-      }
-    }
-    
-    return 'Unknown User';
-  }
-  
-  // Add a new method to delete a post with thorough logging
-  async deletePost(postId, postMesh) {
-    if (!confirm('Are you sure you want to delete this post?')) {
-      return;
-    }
-
-    try {
-      const response = await makeAuthenticatedRequest(
-        `${import.meta.env.VITE_API_URL}/posts/${postId}`,
-        'DELETE'
-      );
-
-      if (response.ok) {
-        console.log('Post deleted successfully:', postId);
-        // Remove the visual post
-        if (postMesh) {
-          postMesh.geometry.dispose();
-          postMesh.material.dispose();
-          this.posts.remove(postMesh);
-        }
-
-        // Remove from local state
-        const currentPosts = this.userPosts.get(this.currentUser._id);
-        if (currentPosts) {
-          this.userPosts.set(
-            this.currentUser._id,
-            currentPosts.filter(post => post._id !== postId)
-          );
-        }
-
-        // Refresh posts display if current user's diorama
-        if (this.currentDioramaIsUserDiorama()) {
-          this.displayPostsForDiorama(this.dioramas.children[this.userDioramaIndex]);
-        }
-      } else {
-        const errorData = await response.json();
-        console.error('Failed to delete post:', error.status, errorData);
-        alert(`Failed to delete post: ${errorData.message || response.statusText}`);
-      }
-    } catch (error) {
-      console.error('Error deleting post:', error);
-      alert('An error occurred while deleting the post.');
-    }
-  }
-
-  updateLikesCount(likes) {
-    if (!Array.isArray(likes)) {
-        console.error('Invalid likes data:', likes);
-        return;
-    }
-
-    const likesContainer = document.querySelector('.likes-count');
-    if (likesContainer) {
-        likesContainer.textContent = likes.length > 0 ? `${likes.length} likes` : 'No likes yet';
-    }
-  }
-
-  createBubbles() {
-    // Remove PostBubble reference and use simple mesh instead
-    const userDiorama = this.visibleDioramas.find(d => d.index === this.userDioramaIndex);
-    if (!userDiorama) return;
-    
-    // Create simple bubble meshes
-    const bubbleGeometry = new THREE.SphereGeometry(0.2, 32, 32);
-    const bubbleMaterial = new THREE.MeshBasicMaterial({ 
-      color: 0x4a90e2,
-      transparent: true,
-      opacity: 0.8
-    });
-    
-    // Create two example bubbles
-    for (let i = 0; i < 2; i++) {
-      const bubble = new THREE.Mesh(bubbleGeometry, bubbleMaterial);
-      bubble.position.set(
-        -3 + (i * 1.5),
-        2,
-        -this.dioramaDepth + 0.3
-      );
-      userDiorama.mesh.add(bubble);
-      this.bubbles.push(bubble);
-    }
-  }
-
-  animate() {
-    if (!this.isActive) return;
-    
-    requestAnimationFrame(this.animate.bind(this));
-    
-    // Update posts
-    this.update();
-    
-    // Render the scene
-    this.renderer.render(this.scene, this.camera);
-    
-    // Update confetti particles if there are any
-    if (this.activeConfetti && this.activeConfetti.length > 0) {
-      this.updateConfetti();
-    }
-  }
-
-  dispose() {
-    this.isActive = false;
-    
-    // Remove event listeners
-    this.cleanupEventListeners();
-    
-    // Close WebSocket connection
-    if (this.socket && this.socket.readyState === WebSocket.OPEN) {
-      this.socket.close();
-    }
-    
-    // Clear scene
-    this.scene.remove(this.dioramas);
-    this.scene.remove(this.posts);
-    
-    // Dispose of all resources
-    this.dioramas.traverse(obj => {
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) {
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach(mat => mat.dispose());
-        } else {
-          obj.material.dispose();
-        }
-      }
-    });
-    
-    this.posts.traverse(obj => {
-      if (obj.geometry) obj.geometry.dispose();
-      if (obj.material) {
-        if (Array.isArray(obj.material)) {
-          obj.material.forEach(mat => mat.dispose());
-        } else {
-          obj.material.dispose();
-        }
-      }
-    });
-    
-    // Clear arrays
-    this.visibleDioramas = [];
-    this.bubbles = [];
-    this.userPosts.clear();
-    this.allUsers = [];
-  }
-
-  async loadAllUsers() {
-    try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users`);
-      const users = await response.json();
-      if (Array.isArray(users)) {
-        this.allUsers = users;
+        console.error('Failed to load all users:', await response.text());
+        this.allUsers = [];
       }
     } catch (error) {
       console.error('Error loading all users:', error);
+      this.allUsers = [];
     }
+
+    // Load initial posts
+    await this.loadPosts();
+
+    // Setup post canvas and creation
+    this.setupPostCanvas();
+    this.setupPostCreation();
+
+    // Set up event listeners (including for mouse interactions and post creation)
+    this.setupEventListeners();
   }
 
-  // Load posts for a specific user
+  // Helper to load user's posts
   async loadUserPosts(userId) {
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/posts/user/${userId}`);
-      const posts = await response.json();
-      if (Array.isArray(posts)) {
-        this.userPosts.set(userId, posts);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/posts/user/${userId}`);
+      if (!response.ok) {
+        throw new Error('Failed to load posts for user');
       }
+      const data = await response.json();
+      this.userPosts.set(userId, data);
+      return data;
     } catch (error) {
-      console.error(`Error loading posts for user ${userId}:`, error);
+      console.error('Error loading user posts:', error);
+      return [];
     }
   }
 
   handleReactionUpdate(data) {
-    // Find the post in all dioramas
-    this.visibleDioramas.forEach(diorama => {
-      const post = diorama.mesh.children.find(child => 
-        child.userData && child.userData.isPost && child.userData.postId === data.postId
-      );
-      
-      if (post) {
-        // Update post reactions
-        post.userData.reactions = data.reactions;
-        
-        // Update reaction counts display
-        this.updateReactionCounts(data.reactions);
-        
-        // If the post is currently in a popup, update that too
-        const popup = document.getElementById('post-popup');
-        if (popup) {
-          const countsContainer = popup.querySelector('.reaction-counts');
-          if (countsContainer) {
-            this.updateReactionCounts(data.reactions, countsContainer);
-          }
-        }
-      }
-    });
+    const { postId, reactionType, userId, action } = data;
+    const postContainer = document.querySelector(`.post[data-post-id="${postId}"]`);
+    if (!postContainer) {
+      console.log('Post container not found for reaction update:', postId);
+      return;
+    }
+
+    // Update reaction counts locally
+    let reactions = JSON.parse(postContainer.getAttribute('data-reactions') || '{}');
+    if (action === 'add') {
+      reactions[reactionType] = (reactions[reactionType] || 0) + 1;
+    } else if (action === 'remove') {
+      reactions[reactionType] = Math.max(0, (reactions[reactionType] || 0) - 1);
+    }
+    postContainer.setAttribute('data-reactions', JSON.stringify(reactions));
+    this.updateReactionCounts(reactions, postContainer); // Update visual counts
+
+    console.log(`Reaction ${action}ed for post ${postId}, type ${reactionType} by user ${userId}. Current reactions:`, reactions);
   }
 
   async handleReaction(postId, reactionType) {
-    if (!this.currentUser) {
-      console.error('Cannot react: User not logged in.');
-      return;
-    }
     try {
       const response = await makeAuthenticatedRequest(
-        `${import.meta.env.VITE_API_URL}/posts/${postId}/react`,
+        `https://threedsocbackend.onrender.com/api/posts/${postId}/react`,
         'POST',
         { reactionType }
       );
-      const result = await response.json();
-      if (result.message === 'Reaction updated' || result.message === 'Reaction added') {
-        console.log('Reaction successful:', result);
-        // Optionally, update the UI immediately with the new reaction counts
-        // For now, relying on socket updates if implemented
-      } else if (result.message === 'Reaction removed') {
-        console.log('Reaction removed:', result);
-      } else {
-        console.warn('Unexpected reaction response:', result);
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to react to post');
       }
-      // Play reaction sound
-      if (this.hasUserInteracted) {
-        this.reactionSound.currentTime = 0;
-        this.reactionSound.play();
-      }
+      const updatedPost = await response.json();
+      console.log('Reaction success, updated post:', updatedPost);
 
+      // Update the reactions on the specific post element
+      const postContainer = document.querySelector(`.post[data-post-id="${postId}"]`);
+      if (postContainer) {
+        postContainer.setAttribute('data-reactions', JSON.stringify(updatedPost.reactions));
+        this.updateReactionCounts(updatedPost.reactions, postContainer);
+      }
     } catch (error) {
       console.error('Error handling reaction:', error);
+      alert('Failed to react to post. Please try again.');
     }
   }
 
   updateReactionCounts(reactions, container = document) {
-    if (!Array.isArray(reactions)) {
-      console.error('Invalid reactions data:', reactions);
-      return;
-    }
+    // Clear existing counts before updating
+    const likeCountSpan = container.querySelector('.like-count');
+    const loveCountSpan = container.querySelector('.love-count');
+    const clapCountSpan = container.querySelector('.clap-count');
 
-    // Count reactions by type
-    const reactionCounts = reactions.reduce((acc, reaction) => {
-      acc[reaction.type] = (acc[reaction.type] || 0) + 1;
-      return acc;
-    }, {});
-
-    // Create or update reaction counts display
-    let countsContainer = container.querySelector('.reaction-counts');
-    if (!countsContainer) {
-      countsContainer = document.createElement('div');
-      countsContainer.className = 'reaction-counts';
-      countsContainer.style.display = 'flex';
-      countsContainer.style.gap = '10px';
-      countsContainer.style.justifyContent = 'center';
-      countsContainer.style.marginTop = '10px';
-      container.appendChild(countsContainer);
-    }
-
-    // Clear existing counts
-    countsContainer.innerHTML = '';
-
-    // Add counts for each reaction type
-    Object.entries(this.REACTION_TYPES).forEach(([emoji, type]) => {
-      const count = reactionCounts[type] || 0;
-      if (count > 0) {
-        const countElement = document.createElement('span');
-        countElement.textContent = `${emoji} ${count}`;
-        countElement.style.fontSize = '14px';
-        countsContainer.appendChild(countElement);
-      }
-    });
+    if (likeCountSpan) likeCountSpan.textContent = reactions.like || '';
+    if (loveCountSpan) loveCountSpan.textContent = reactions.love || '';
+    if (clapCountSpan) clapCountSpan.textContent = reactions.clap || '';
   }
 
   async loadPosts() {
+    this.isLoadingPosts = true;
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/posts`);
-      const posts = await response.json();
-      if (Array.isArray(posts)) {
-        // Group posts by user ID
-        this.userPosts.clear();
-        posts.forEach(post => {
-          const userId = post.userId?._id || post.userId; // Handle populated or raw userId
-          if (userId) {
-            if (!this.userPosts.has(userId)) {
-              this.userPosts.set(userId, []);
-            }
-            this.userPosts.get(userId).push(post);
-          }
-        });
-        this.updateDioramasFromPosts();
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/posts`);
+      if (!response.ok) {
+        throw new Error('Failed to load posts');
       }
+      const data = await response.json();
+      this.postsData = Array.isArray(data) ? data : [];
+      console.log('Posts loaded:', this.postsData);
+
+      // Clear existing posts
+      while (this.posts.children.length > 0) {
+        const mesh = this.posts.children[0];
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) {
+          if (Array.isArray(mesh.material)) {
+            mesh.material.forEach(m => m.dispose());
+          } else {
+            mesh.material.dispose();
+          }
+        }
+        this.posts.remove(mesh);
+      }
+      this.postMeshes = [];
+
+      // Create 3D posts for each post
+      this.postsData.forEach((post, index) => {
+        const diorama = this.visibleDioramas[index % this.visibleDioramas.length];
+        if (diorama) {
+          const postMesh = this.createVisualPost(post, diorama);
+          this.posts.add(postMesh);
+          this.postMeshes.push(postMesh);
+        }
+      });
+      // Sort posts visually by createdAt
+      this.posts.children.sort((a, b) => {
+        const postA = this.postsData.find(p => p._id === a.userData.postId);
+        const postB = this.postsData.find(p => p._id === b.userData.postId);
+        return new Date(postA.createdAt) - new Date(postB.createdAt);
+      });
     } catch (error) {
       console.error('Error loading posts:', error);
+    } finally {
+      this.isLoadingPosts = false;
     }
   }
 
@@ -2574,197 +731,103 @@ export class Home {
         // Continue animation if not complete
         if (progress < 1) {
           requestAnimationFrame(animatePosition);
-        } else {
-          // Animation complete, set final position
-          postMesh.position.copy(targetPosition);
         }
       };
       
-      // Start animation
       animatePosition();
     });
   }
 
-  // Add method to update a permanent connection cord to reflect current diorama positions
+  // Handle permanent connections for dioramas
   updatePermanentConnection(cord) {
-    if (!cord || !cord.userData || !cord.userData.isPermanentConnection) return;
-    
-    // Find source and target dioramas
-    const sourceDiorama = this.visibleDioramas.find(d => d.index === cord.userData.sourceDioramaIndex);
-    const targetDiorama = this.visibleDioramas.find(d => d.index === cord.userData.targetDioramaIndex);
-    
-    if (!sourceDiorama || !targetDiorama) {
-      console.warn('Cannot update permanent connection: diorama not found');
+    if (!this.isActive) return;
+
+    if (!cord) {
+      console.error('Cord object is null, cannot update permanent connection.');
       return;
     }
-    
-    // Find the connector object in source diorama
-    const sourceConnector = sourceDiorama.mesh.children.find(child => 
-      child.userData && child.userData.isConnector
-    );
-    
-    if (!sourceConnector) return;
-    
-    // Get world position of the source connector - accounting for all parent transformations
-    const startPoint = new THREE.Vector3();
-    sourceConnector.getWorldPosition(startPoint);
-    
-    // Create an end point for the target diorama based on its current world position
-    const targetPosition = new THREE.Vector3();
-    targetDiorama.mesh.getWorldPosition(targetPosition);
-    
-    // Adjust the endpoint to connect to the left side of the target diorama
-    const endPoint = new THREE.Vector3(
-      targetPosition.x - 3, // Left side connection point
-      targetPosition.y,
-      targetPosition.z - this.dioramaDepth/2 + 0.5
-    );
-    
-    // Create a curved path with height based on distance
-    const distance = startPoint.distanceTo(endPoint);
-    const heightFactor = Math.min(1, distance / 20); // Scale height based on distance, but cap it
-    
-    const curve = new THREE.CubicBezierCurve3(
-      startPoint,
-      new THREE.Vector3(startPoint.x + distance * 0.25, startPoint.y + 1 * heightFactor, startPoint.z),
-      new THREE.Vector3(endPoint.x - distance * 0.25, endPoint.y + 1 * heightFactor, endPoint.z),
-      endPoint
-    );
-    
-    // Get points from the curve
-    const points = curve.getPoints(50);
-    
-    // Update cord geometry
-    cord.geometry.dispose();
-    cord.geometry = new THREE.BufferGeometry().setFromPoints(points);
-    
-    return cord;
+
+    if (!cord.userData.sourceDiorama || !cord.userData.targetDiorama) {
+      console.error('Source or target diorama missing from cord userData.');
+      return;
+    }
+
+    const sourcePos = cord.userData.sourceDiorama.mesh.position.clone();
+    const targetPos = cord.userData.targetDiorama.mesh.position.clone();
+
+    // Adjust for camera movement if applicable, though typically not needed for fixed connections
+    // Example: sourcePos.add(this.camera.position.clone().negate());
+
+    const distance = sourcePos.distanceTo(targetPos);
+    const midPoint = new THREE.Vector3().addVectors(sourcePos, targetPos).divideScalar(2);
+
+    // Position the cord between the dioramas
+    cord.position.copy(midPoint);
+
+    // Make the cord always face the camera
+    cord.lookAt(this.camera.position);
+
+    // Stretch the cord to span the distance
+    const scaleFactor = distance / cord.geometry.parameters.height; // Assuming cord is a cylinder along Y-axis
+    cord.scale.set(1, scaleFactor, 1);
+
+    // Rotate to align with the vector between dioramas
+    const direction = new THREE.Vector3().subVectors(targetPos, sourcePos).normalize();
+    const axis = new THREE.Vector3(0, 1, 0); // Original axis of the cylinder
+    cord.quaternion.setFromUnitVectors(axis, direction);
+
+    cord.rotation.x += Math.PI / 2; // Adjust for cylinder default orientation
   }
 
-  // Add method to update all permanent connections
+  // Update all permanent connections
   updateAllPermanentConnections() {
-    // Find all permanent connection cords
-    const permanentConnections = this.scene.children.filter(child => 
-      child.userData && child.userData.isPermanentConnection
-    );
-    
-    // Update each connection
-    permanentConnections.forEach(cord => {
+    this.cordSystem.anchored.forEach(cord => {
       this.updatePermanentConnection(cord);
     });
   }
 
-  // Add new method to initialize variations
+  // Initialize variations (example with default objects)
   initializeVariations() {
-    // Define variations for different furniture types
-    this.dioramaEditing.variations.set('bed', [
-      { name: 'Default Bed', model: '/models/modern-bedroom.glb', object: 'bed' },
-      { name: 'Luxury Bed', model: '/models/variations/luxury-bed.glb' },
-      { name: 'Minimalist Bed', model: '/models/variations/minimalist-bed.glb' }
-    ]);
-    
-    this.dioramaEditing.variations.set('desk', [
-      { name: 'Default Desk', model: '/models/modern-bedroom.glb', object: 'desk' },
-      { name: 'Gaming Desk', model: '/models/variations/gaming-desk.glb' },
-      { name: 'Study Desk', model: '/models/variations/study-desk.glb' }
-    ]);
-    
-    this.dioramaEditing.variations.set('chair', [
-      { name: 'Default Chair', model: '/models/modern-bedroom.glb', object: 'chair' },
-      { name: 'Gaming Chair', model: '/models/variations/gaming-chair.glb' },
-      { name: 'Office Chair', model: '/models/variations/office-chair.glb' }
-    ]);
-    
-    // Add more furniture types as needed
+    // These should be loaded from external files or configurations
   }
 
-  // Add method to handle object selection
   handleObjectSelection(object) {
-    if (!this.dioramaEditing.isActive) return;
-    
-    // Clear previous selection
     if (this.dioramaEditing.selectedObject) {
       this.clearObjectHighlight();
     }
-    
-    // Store selected object
     this.dioramaEditing.selectedObject = object;
-    
-    // Highlight the selected object
     this.highlightObject(object);
-    
-    // Show variation selection UI
-    this.showVariationSelector(object);
   }
 
-  // Add method to highlight object
   highlightObject(object) {
-    if (!object) return;
-    
-    // Store original materials
-    this.dioramaEditing.originalMaterials.set(object, object.material);
-    
-    // Apply highlight material
-    object.material = this.dioramaEditing.highlightMaterial.clone();
-    
-    // Add subtle animation
-    const originalScale = object.scale.clone();
-    const targetScale = originalScale.multiplyScalar(1.05);
-    
-    // Animate scale
-    const duration = 0.3;
-    const startTime = Date.now();
-    
-    const animate = () => {
-      const elapsed = (Date.now() - startTime) / 1000;
-      const progress = Math.min(elapsed / duration, 1);
-      
-      // Use easing function
-      const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
-      
-      // Interpolate scale
-      object.scale.lerpVectors(originalScale, targetScale, easeProgress);
-      
-      if (progress < 1) {
-        requestAnimationFrame(animate);
+    if (object.material) {
+      if (!this.dioramaEditing.originalMaterials.has(object)) {
+        this.dioramaEditing.originalMaterials.set(object, object.material);
       }
-    };
-    
-    animate();
+      object.material = this.dioramaEditing.highlightMaterial;
+    }
   }
 
-  // Add method to clear object highlight
+  // Clear highlight from object
   clearObjectHighlight() {
-    if (!this.dioramaEditing.selectedObject) return;
-    
-    const object = this.dioramaEditing.selectedObject;
-    
-    // Restore original material
-    if (this.dioramaEditing.originalMaterials.has(object)) {
-      object.material = this.dioramaEditing.originalMaterials.get(object);
-      this.dioramaEditing.originalMaterials.delete(object);
+    if (this.dioramaEditing.selectedObject && this.dioramaEditing.originalMaterials.has(this.dioramaEditing.selectedObject)) {
+      this.dioramaEditing.selectedObject.material = this.dioramaEditing.originalMaterials.get(this.dioramaEditing.selectedObject);
+      this.dioramaEditing.originalMaterials.delete(this.dioramaEditing.selectedObject);
     }
-    
-    // Reset scale
-    object.scale.set(1, 1, 1);
-    
-    // Clear selection
     this.dioramaEditing.selectedObject = null;
   }
 
-  // Add method to handle object dragging
   handleObjectDrag(event) {
-    if (!this.dioramaEditing.isActive || !this.dioramaEditing.selectedObject) return;
-    
-    const object = this.dioramaEditing.selectedObject;
-    
-    // Update mouse position
+    if (!this.dioramaEditing.isDragging || !this.dioramaEditing.selectedObject) return;
+
+    // Update the raycaster with the new mouse position
     this.mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
     this.mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
-    
-    // Update raycaster
     this.raycaster.setFromCamera(this.mouse, this.camera);
-    
+
+    // Intersect with the drag plane
+    const intersection = new THREE.Vector3();
+    if (this.raycaster.ray.intersectPlane(this.dioramaEditing.dragPlane, intersection)) {
     // Find intersection with drag plane
     const intersects = this.raycaster.ray.intersectPlane(this.dioramaEditing.dragPlane, new THREE.Vector3());
     
@@ -2827,30 +890,24 @@ export class Home {
 
   // Add method to save object position
   async saveObjectPosition(object) {
-    if (!object || !object.userData || !object.userData.dbId) {
+    if (!object || !object.userData || !object.userData.id) {
       console.warn('Attempted to save object position for an invalid object.');
       return;
     }
     
-    const dioramaId = object.userData.dbId;
-    const updatedDiorama = {
-      position: {
-        x: object.position.x,
-        y: object.position.y,
-        z: object.position.z
-      },
-      rotation: {
-        x: object.rotation.x,
-        y: object.rotation.y,
-        z: object.rotation.z
-      }
-    };
+    const objectId = object.userData.id;
+    const objectType = object.userData.type;
 
     try {
       const response = await makeAuthenticatedRequest(
-        `${import.meta.env.VITE_API_URL}/users/character`,
+        `https://threedsocbackend.onrender.com/api/users/character`,
         'PUT',
-        updatedDiorama
+        {
+          type: objectType,
+          id: objectId,
+          position: object.position,
+          rotation: object.rotation
+        }
       );
       
       if (response.ok) {
