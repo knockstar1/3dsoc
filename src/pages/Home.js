@@ -340,7 +340,7 @@ export class Home {
     // Get fresh character data directly from the character API endpoint
     let freshCharacterData = null;
     try {
-      const characterResponse = await makeAuthenticatedRequest('http://localhost:5000/api/users/character');
+      const characterResponse = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/character`);
       if (characterResponse.ok) {
         const responseData = await characterResponse.json();
         console.log('Successfully loaded character response from API:', responseData);
@@ -396,7 +396,7 @@ export class Home {
     // Get current user with most up-to-date data
     try {
       // Always try to get from API first to ensure fresh user data
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/verify');
+      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/verify`);
       if (response.ok) {
         const userData = await response.json();
         this.currentUser = userData;
