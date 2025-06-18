@@ -228,7 +228,7 @@
     // Load existing character data
     async function loadCharacter() {
       try {
-        const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/character`);
+        const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/character`);
         const userData = await response.json();
         
         if (userData) {

@@ -6,10 +6,12 @@
  * @returns {Promise<Response>} - The response from the API
  */
 export async function makeAuthenticatedRequest(url, method = 'GET', data = null) {
+    const BASE_API_URL = 'https://threedsocbackend.onrender.com/api';
+    const fullUrl = `${BASE_API_URL}${url.startsWith('/') ? url : '/' + url}`;
     const token = localStorage.getItem('token');
     
     // Enhanced logging of API requests
-    console.log(`Making ${method} request to ${url}` + (data ? ' with data' : ' without data'));
+    console.log(`Making ${method} request to ${fullUrl}` + (data ? ' with data' : ' without data'));
     if (data) {
         console.log('Request data preview:', JSON.stringify(data).substring(0, 100) + (JSON.stringify(data).length > 100 ? '...' : ''));
     }
@@ -25,10 +27,10 @@ export async function makeAuthenticatedRequest(url, method = 'GET', data = null)
     // Add body for non-GET requests
     if (method !== 'GET' && data) {
         // Special handling for endpoints that need direct data
-        if (url.includes('/character') && method === 'PUT' || 
-            url.includes('/posts') || 
-            url.includes('/messages') ||
-            url.includes('/reaction')) {
+        if (fullUrl.includes('/character') && method === 'PUT' || 
+            fullUrl.includes('/posts') || 
+            fullUrl.includes('/messages') ||
+            fullUrl.includes('/reaction')) {
             options.body = JSON.stringify(data);
         } else {
             options.body = JSON.stringify({ character: data });
@@ -36,13 +38,13 @@ export async function makeAuthenticatedRequest(url, method = 'GET', data = null)
     }
     
     try {
-        const response = await fetch(url, options);
+        const response = await fetch(fullUrl, options);
         
-        console.log(`API request to ${url} ${response.ok ? 'successful' : 'failed'} with status ${response.status}`);
+        console.log(`API request to ${fullUrl} ${response.ok ? 'successful' : 'failed'} with status ${response.status}`);
         
         return response;
     } catch (error) {
-        console.error(`API request to ${url} failed with error:`, error);
+        console.error(`API request to ${fullUrl} failed with error:`, error);
         throw error;
     }
 } 

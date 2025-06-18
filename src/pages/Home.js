@@ -197,11 +197,11 @@ export class Home {
         return;
       }
       
-      // Use VITE_WS_URL for WebSocket connection
-      const wsUrl = import.meta.env.VITE_WS_URL;
+      // Use hardcoded WebSocket URL
+      const wsUrl = 'wss://threedsocbackend.onrender.com';
 
       if (!wsUrl) {
-        console.error('VITE_WS_URL environment variable is not set. WebSocket will not connect.');
+        console.error('WebSocket URL is not set. WebSocket will not connect.');
         return;
       }
 
@@ -340,7 +340,7 @@ export class Home {
     // Get fresh character data directly from the character API endpoint
     let freshCharacterData = null;
     try {
-      const characterResponse = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/character`);
+      const characterResponse = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/character`);
       if (characterResponse.ok) {
         const responseData = await characterResponse.json();
         console.log('Successfully loaded character response from API:', responseData);
@@ -396,7 +396,7 @@ export class Home {
     // Get current user with most up-to-date data
     try {
       // Always try to get from API first to ensure fresh user data
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/verify`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/verify`);
       if (response.ok) {
         const userData = await response.json();
         this.currentUser = userData;
@@ -660,7 +660,7 @@ export class Home {
     }
 
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/verify`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/verify`);
       if (response.ok) {
         this.isAuth = true;
         this.currentUser = JSON.parse(currentUser);
@@ -1055,7 +1055,7 @@ export class Home {
     };
 
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/posts`, 'POST', postData);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/posts`, 'POST', postData);
       const newPost = await response.json();
       if (newPost) {
         console.log('Post created:', newPost);

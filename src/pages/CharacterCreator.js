@@ -621,153 +621,34 @@ export class CharacterCreator {
   }
 
   async loadCharacter(characterData) {
-    console.log('Loading character with data:', characterData);
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    if (!currentUser || !currentUser._id) {
+      console.warn('No current user or user ID found in localStorage for loading character.');
+      return;
+    }
+
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/character`);
-      const data = await response.json();
-      
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/${currentUser._id}/character`);
       if (!response.ok) {
-        throw new Error(`Failed to load character from API: ${response.status}`);
-      }
-      
-      console.log('API response for character:', data);
-      
-      // Handle nested character data structure 
-      let extractedData;
-      if (data.character && typeof data.character === 'object') {
-        console.log('Character data is nested under character property');
-        extractedData = data.character;
-        
-        // Add bio from top level if not in character object
-        if (data.bio && !extractedData.bio) {
-          extractedData.bio = data.bio;
+        // If no character is found (e.g., 404), create a default one
+        if (response.status === 404) {
+          console.log('No existing character found for user, creating default.');
+          this.createDefaultCharacter();
+          return;
         }
+        throw new Error(`Failed to load character: ${response.statusText}`);
+      }
+      const data = await response.json();
+      if (data.character) {
+        this.applyCharacterData(data.character);
       } else {
-        extractedData = data;
-      }
-      
-      // Normalize the data structure - handle all possible formats
-      let normalizedData = {
-        variations: {},
-        colors: {},
-        bio: ''
-      };
-      
-      // Check various possible data structures
-      if (extractedData && typeof extractedData === 'object') {
-        // Case 1: Direct variations and colors at top level
-        if (extractedData.variations && typeof extractedData.variations === 'object') {
-          normalizedData.variations = {...extractedData.variations};
-          console.log('Found variations at top level');
-        }
-        
-        if (extractedData.colors && typeof extractedData.colors === 'object') {
-          normalizedData.colors = {...extractedData.colors};
-          console.log('Found colors at top level');
-        }
-        
-        if (extractedData.bio) {
-          normalizedData.bio = extractedData.bio;
-          console.log('Found bio at top level');
-        }
-      }
-      
-      // Ensure all required properties exist with defaults
-      const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-      for (const part of parts) {
-        if (normalizedData.variations[part] === undefined) {
-          normalizedData.variations[part] = 0;
-        }
-        
-        if (normalizedData.colors[part] === undefined) {
-          normalizedData.colors[part] = this.getDefaultColor(part);
-        }
-      }
-      
-      // If we have any valid character data, apply it
-      if (Object.keys(normalizedData.variations).length > 0 || 
-          Object.keys(normalizedData.colors).length > 0) {
-        console.log('Applying normalized character data:', normalizedData);
-        this.applyCharacterData(normalizedData);
-        
-        // If we're on the character page, update the bio field
-        if (window.location.pathname.includes('character.html')) {
-          const bioElement = document.getElementById('character-bio');
-          if (bioElement) {
-            bioElement.value = normalizedData.bio || '';
-            console.log('Bio loaded from API:', normalizedData.bio);
-          }
-        }
-      } else {
-        console.log('No usable character data found, creating default character');
-        this.createDefaultCharacter();
+        this.applyCharacterData(data);
       }
     } catch (error) {
-      console.error('Error loading character from API:', error);
-      
-      // Only use localStorage as a last resort
-      try {
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        if (currentUser?.character) {
-          console.log('Falling back to localStorage character data');
-          
-          // Extract character data - handle nested structure
-          let localData = currentUser.character;
-          if (localData.character && typeof localData.character === 'object') {
-            localData = localData.character;
-          }
-          
-          // Normalize localStorage data
-          let normalizedData = {
-            variations: {},
-            colors: {},
-            bio: ''
-          };
-          
-          if (localData.variations) {
-            normalizedData.variations = {...localData.variations};
-          }
-          
-          if (localData.colors) {
-            normalizedData.colors = {...localData.colors};
-          }
-          
-          if (localData.bio) {
-            normalizedData.bio = localData.bio;
-          } else if (currentUser.bio) {
-            normalizedData.bio = currentUser.bio;
-          }
-          
-          // Ensure all parts have valid values
-          const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-          for (const part of parts) {
-            if (normalizedData.variations[part] === undefined) {
-              normalizedData.variations[part] = 0;
-            }
-            
-            if (normalizedData.colors[part] === undefined) {
-              normalizedData.colors[part] = this.getDefaultColor(part);
-            }
-          }
-          
-          this.applyCharacterData(normalizedData);
-          
-          // If we're on the character page, update the bio field
-          if (window.location.pathname.includes('character.html')) {
-            const bioElement = document.getElementById('character-bio');
-            if (bioElement) {
-              bioElement.value = normalizedData.bio || '';
-              console.log('Bio loaded from localStorage:', normalizedData.bio);
-            }
-          }
-        } else {
-          console.log('No character data available, creating default character');
-          this.createDefaultCharacter();
-        }
-      } catch (e) {
-        console.error('Error loading from localStorage:', e);
-        this.createDefaultCharacter();
-      }
+      console.error('Error loading character:', error);
+      this.showMessage(`Failed to load character: ${error.message || 'Unknown error'}`, 'error');
+      // Fallback to creating a default character if loading fails
+      this.createDefaultCharacter();
     }
   }
 
@@ -865,34 +746,25 @@ export class CharacterCreator {
   }
 
   async saveCharacter() {
-    if (!this.character || !this.character.userData) {
-      console.warn('No character data to save.');
-      this.showMessage('No character to save.', 'error');
+    const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+    if (!currentUser || !currentUser._id) {
+      this.showMessage('Cannot save character: user not authenticated.', 'error');
       return;
     }
 
     const characterData = {
       variations: this.currentVariations,
-      colors: this.colors,
-      position: {
-        x: this.character.position.x,
-        y: this.character.position.y,
-        z: this.character.position.z,
-      },
-      rotation: {
-        x: this.character.rotation.x,
-        y: this.character.rotation.y,
-        z: this.character.rotation.z,
-      },
+      colors: this.colors
     };
 
     try {
+      // Only send parts that have actually changed or have a value
       const response = await makeAuthenticatedRequest(
-        `${import.meta.env.VITE_API_URL}/users/character`,
+        `https://threedsocbackend.onrender.com/api/users/${currentUser._id}/character`,
         'PUT',
         characterData
       );
-      
+
       if (response.ok) {
         console.log('Character saved to API successfully');
         
@@ -914,6 +786,7 @@ export class CharacterCreator {
         // Show success message if we're on the character page
         if (window.location.pathname.includes('character.html')) {
           this.showMessage('Character saved successfully!', 'success');
+          window.dispatchEvent(new CustomEvent('navigate', { detail: { page: 'home' } }));
         }
         
         return true;
@@ -926,9 +799,7 @@ export class CharacterCreator {
       }
     } catch (error) {
       console.error('Error saving character:', error);
-      if (window.location.pathname.includes('character.html')) {
-        this.showMessage('Failed to save character. Please try again.', 'error');
-      }
+      this.showMessage(`Failed to save character: ${error.message || 'Unknown error'}`, 'error');
       return false;
     }
   }

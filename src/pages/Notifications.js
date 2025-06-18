@@ -163,7 +163,7 @@ export class Notifications {
 
   async loadNotifications() {
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/notifications`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/notifications`);
       if (!response.ok) {
         throw new Error('Failed to load notifications');
       }

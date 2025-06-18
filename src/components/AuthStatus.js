@@ -34,7 +34,7 @@ export class AuthStatus {
         return;
       }
       
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users/verify`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users/verify`);
       if (response.ok) {
         this.setLoggedIn();
       } else {

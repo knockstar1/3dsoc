@@ -35,7 +35,7 @@ export class Auth {
                     // Clear storage before attempting to login
                     this.clearLocalStorage();
                     
-                    const response = await fetch(`${import.meta.env.VITE_API_URL}/users/login`, {
+                    const response = await fetch(`https://threedsocbackend.onrender.com/api/users/login`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -78,7 +78,7 @@ export class Auth {
                     }
                     
                     // Verify token before proceeding
-                    const verifyResponse = await fetch(`${import.meta.env.VITE_API_URL}/users/verify`, {
+                    const verifyResponse = await fetch(`https://threedsocbackend.onrender.com/api/users/verify`, {
                         headers: {
                             'Authorization': `Bearer ${data.token}`
                         }
@@ -119,7 +119,7 @@ export class Auth {
                     // Clear storage before registration
                     this.clearLocalStorage();
                     
-                    const response = await fetch(`${import.meta.env.VITE_API_URL}/users/register`, {
+                    const response = await fetch(`https://threedsocbackend.onrender.com/api/users/register`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'

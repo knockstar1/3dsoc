@@ -45,7 +45,7 @@ export class Messages {
 
   async loadUsers() {
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/users`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/users`);
       const users = await response.json();
       
       if (Array.isArray(users)) {
@@ -109,7 +109,7 @@ export class Messages {
 
   async loadMessages(userId) {
     try {
-      const response = await makeAuthenticatedRequest(`${import.meta.env.VITE_API_URL}/messages/${userId}`);
+      const response = await makeAuthenticatedRequest(`https://threedsocbackend.onrender.com/api/messages/${userId}`);
       const messages = await response.json();
       
       if (Array.isArray(messages)) {
@@ -180,7 +180,7 @@ export class Messages {
     
     try {
       const response = await makeAuthenticatedRequest(
-        `${import.meta.env.VITE_API_URL}/messages`,
+        `https://threedsocbackend.onrender.com/api/messages`,
         'POST', 
         {
           recipient: this.currentChat._id,
