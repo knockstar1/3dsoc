@@ -19,6 +19,16 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const app = express();
 
+// Serve static files in production
+if (process.env.NODE_ENV === 'production') {
+  const pathToDist = path.resolve(__dirname, '..', 'dist');
+  app.use(express.static(pathToDist));
+
+  app.get('*', (req, res) => {
+    res.sendFile(path.resolve(pathToDist, 'index.html'));
+  });
+}
+
 // Middleware
 app.use(express.json());
 app.use(cors({
@@ -47,16 +57,6 @@ app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
-
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  const pathToDist = path.resolve(__dirname, '..', 'dist');
-  app.use(express.static(pathToDist));
-
-  app.get('*', (req, res) => {
-    res.sendFile(path.resolve(pathToDist, 'index.html'));
-  });
-}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
