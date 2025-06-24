@@ -87,5 +87,4 @@ class PostService {
   // Remove handleError as makeAuthenticatedRequest handles logging
 }
 
-export default new PostService();
 export default new PostService(); 

@@ -197,21 +197,11 @@ export class Home {
         return;
       }
       
-      // Try to use secure WebSocket if on HTTPS
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Dynamically determine WebSocket protocol and host
+      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsHost = window.location.host; // Use the current host to ensure it works on Render
       
-      // Try different host options in order
-      const hostOptions = [
-        '127.0.0.1:5000',
-        'localhost:5000',
-        window.location.hostname + ':5000'
-      ];
-      
-      // Get a host that might work
-      const host = hostOptions[0];  // Start with first option
-      
-      // Try to connect with a timeout
-      const socketUrl = `${protocol}//${host}`;
+      const socketUrl = `${wsProtocol}//${wsHost}`;
       console.log(`Attempting to connect to WebSocket at ${socketUrl}`);
       
       // Set a timeout to prevent hanging on connection
@@ -659,51 +649,23 @@ export class Home {
 
   async checkAuth() {
     try {
-      const token = localStorage.getItem('token');
-      
-      if (!token) {
-        console.log('No token found');
-        return false;
-      }
-      
-      // Always verify token with server and get fresh character data
-      try {
-        console.log('Verifying token and getting fresh character data');
-        const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/verify');
-        
-        if (!response.ok) {
-          throw new Error('Invalid token');
-        }
-        
-        const userData = await response.json();
-        // Update current user with complete data from server, including latest character data
-        this.currentUser = {
-          _id: userData._id,
-          username: userData.username,
-          bio: userData.bio || '',
-          character: userData.character || null
-        };
-        
-        console.log('Received fresh character data from API verification');
-        
-        try {
-          // Store complete user data including character
-          localStorage.setItem('currentUser', JSON.stringify(this.currentUser));
-        } catch (storageError) {
-          console.error('Storage error while updating user data:', storageError);
-          // If storage fails, we already have the data in memory
-        }
-        
-        return true;
-      } catch (error) {
-        console.error('Auth verification failed:', error);
+      const response = await makeAuthenticatedRequest('/api/users/verify');
+      if (!response.ok) {
+        console.log('Token verification failed or no token.');
         localStorage.removeItem('token');
         localStorage.removeItem('currentUser');
-        return false;
+        return null;
       }
+      const data = await response.json();
+      this.currentUser = data.user;
+      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      console.log('User authenticated:', this.currentUser);
+      return this.currentUser;
     } catch (error) {
-      console.error('Unexpected error in checkAuth:', error);
-      return false;
+      console.error('Error during authentication check:', error);
+      localStorage.removeItem('token');
+      localStorage.removeItem('currentUser');
+      return null;
     }
   }
 
@@ -2393,162 +2355,31 @@ export class Home {
 
   async loadAllUsers() {
     try {
-      console.log('Loading all users with fresh data from API');
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users');
-      
+      const response = await makeAuthenticatedRequest('/api/users');
       if (!response.ok) {
-        throw new Error('Failed to load users from API');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
       const users = await response.json();
-      
-      if (Array.isArray(users)) {
-        // Store complete user data including full character information
-        this.allUsers = users.map(user => {
-          // Process character data to ensure it's in the correct format
-          let character = null;
-          if (user.character) {
-            character = {
-              variations: user.character.variations || {},
-              colors: user.character.colors || {},
-              bio: user.character.bio || user.bio || ''
-            };
-            
-            // Ensure variations and colors are not undefined
-            if (!character.variations) character.variations = {};
-            if (!character.colors) character.colors = {};
-          }
-          
-          return {
-            _id: user._id,
-            username: user.username,
-            bio: user.bio || '',
-            character: character
-          };
-        });
-        console.log('Loaded users with fresh character data:', this.allUsers.length);
-        
-        // If we have the current user from memory, update their data in allUsers
-        if (this.currentUser && this.currentUser._id) {
-          const userIndex = this.allUsers.findIndex(u => u._id === this.currentUser._id);
-          if (userIndex >= 0) {
-            console.log(`Updating user ${this.allUsers[userIndex].username} with current user character data`);
-            
-            // If we have fresh character data from API, use that
-            if (this.freshCharacterData) {
-              console.log('Using freshly loaded character data from API for user in allUsers');
-              this.allUsers[userIndex].character = JSON.parse(JSON.stringify(this.freshCharacterData));
-            } 
-            // Otherwise use character data from currentUser
-            else if (this.currentUser.character) {
-              // Ensure character data is in the correct format
-              let characterData = this.currentUser.character;
-              if (!characterData.variations || !characterData.colors) {
-                characterData = {
-                  variations: characterData.variations || {},
-                  colors: characterData.colors || {},
-                  bio: characterData.bio || this.currentUser.bio || ''
-                };
-              }
-              
-              // Ensure all character parts have values
-              const parts = ['head', 'teeth', 'shirt', 'belt', 'pants', 'shoes'];
-              parts.forEach(part => {
-                if (characterData.variations[part] === undefined) {
-                  characterData.variations[part] = 0;
-                }
-                if (characterData.colors[part] === undefined) {
-                  const defaultColors = {
-                    head: 0xffcc99,
-                    teeth: 0xffffff,
-                    shirt: 0x0000ff,
-                    belt: 0x000000,
-                    pants: 0x000080,
-                    shoes: 0x222222
-                  };
-                  characterData.colors[part] = defaultColors[part];
-                }
-              });
-              
-              this.allUsers[userIndex].character = characterData;
-            }
-          }
-        }
-        
-        // Load posts for each user
-        for (const user of this.allUsers) {
-          await this.loadUserPosts(user._id);
-        }
-      } else {
-        console.error('Invalid users response:', users);
-      }
+      this.allUsers = users;
+      console.log('Loaded all users:', this.allUsers.length);
     } catch (error) {
-      console.error('Error loading users:', error);
-      
-      // If API fails, try to use cached data as fallback
-      const currentUserStr = localStorage.getItem('currentUser');
-      if (currentUserStr) {
-        try {
-          const currentUser = JSON.parse(currentUserStr);
-          if (currentUser && currentUser._id) {
-            console.log('Using cached data for current user as fallback');
-            
-            // Ensure character data is in the correct format
-            if (currentUser.character) {
-              if (!currentUser.character.variations || !currentUser.character.colors) {
-                currentUser.character = {
-                  variations: currentUser.character.variations || {},
-                  colors: currentUser.character.colors || {},
-                  bio: currentUser.character.bio || currentUser.bio || ''
-                };
-              }
-            }
-            
-            this.allUsers = [currentUser];
-          }
-        } catch (e) {
-          console.error('Error parsing currentUser from localStorage:', e);
-        }
-      }
+      console.error('Error loading all users:', error);
+      // Optionally throw or handle the error more gracefully
     }
   }
 
   async loadUserPosts(userId) {
     try {
-      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/posts/user/${userId}`);
-      const result = await response.json();
-      
-      if (result.success && Array.isArray(result.data)) {
-        // Store posts in memory
-        this.userPosts.set(userId, result.data);
-        console.log(`Loaded ${result.data.length} posts for user ${userId}`);
-        
-        // Find the correct diorama for this user
-        const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === userId);
-        if (userDiorama) {
-          // Clear existing posts for this diorama
-          const existingPosts = userDiorama.mesh.children.filter(child => 
-            child.userData && child.userData.isPost
-          );
-          
-          // Remove posts from scene
-          existingPosts.forEach(post => userDiorama.mesh.remove(post));
-          
-          // Clear post data arrays
-          if (userDiorama.mesh.userData.posts) {
-            userDiorama.mesh.userData.posts = [];
-          }
-          
-          // Create visual posts for the loaded posts
-          result.data.forEach(post => {
-            this.createVisualPost(post, userDiorama);
-          });
-        }
-      } else {
-        console.error('Invalid posts response:', result);
+      const response = await makeAuthenticatedRequest(`/api/posts/user/${userId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      const posts = await response.json();
+      this.userPosts.set(userId, posts);
+      console.log(`Loaded ${posts.length} posts for user ${userId}`);
     } catch (error) {
       console.error(`Error loading posts for user ${userId}:`, error);
+      // Optionally throw or handle the error more gracefully
     }
   }
 
@@ -2581,9 +2412,9 @@ export class Home {
   async handleReaction(postId, reactionType) {
     try {
       const response = await makeAuthenticatedRequest(
-        `http://localhost:5000/api/posts/${postId}/react`,
-        'POST',
-        { type: this.REACTION_TYPES[reactionType] }
+        `/api/posts/${postId}/react`, 
+        'POST', 
+        { reactionType }
       );
 
       if (!response.ok) {
@@ -2638,63 +2469,14 @@ export class Home {
 
   async loadPosts() {
     try {
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/posts');
-      const result = await response.json();
-      
-      if (result.posts && Array.isArray(result.posts)) {
-        console.log('Loaded posts:', result.posts);
-        
-        // Group posts by user ID
-        const postsByUser = new Map();
-        result.posts.forEach(post => {
-          const userId = post.userId;
-          if (!postsByUser.has(userId)) {
-            postsByUser.set(userId, []);
-          }
-          postsByUser.get(userId).push(post);
-        });
-        
-        // Update our main userPosts map with any new posts
-        postsByUser.forEach((posts, userId) => {
-          const existingPosts = this.userPosts.get(userId) || [];
-          
-          // Filter out duplicates - only add posts we don't already have
-          const newPosts = posts.filter(newPost => 
-            !existingPosts.some(existingPost => existingPost._id === newPost._id)
-          );
-          
-          if (newPosts.length > 0) {
-            this.userPosts.set(userId, [...existingPosts, ...newPosts]);
-            console.log(`Added ${newPosts.length} new posts for user ${userId}`);
-          }
-        });
-        
-        // Create visual posts for visible dioramas - only for new posts
-        this.visibleDioramas.forEach(diorama => {
-          const userId = diorama.mesh.userData.userId;
-          const allUserPosts = this.userPosts.get(userId) || [];
-          
-          // Get list of post IDs already in the diorama
-          const existingPostIds = new Set();
-          if (diorama.mesh.userData.posts) {
-            diorama.mesh.userData.posts.forEach(post => {
-              existingPostIds.add(post.postId);
-            });
-          }
-          
-          // Filter posts to only create ones we don't already have visually
-          const postsToCreate = allUserPosts.filter(post => !existingPostIds.has(post._id));
-          
-          if (postsToCreate.length > 0) {
-            console.log(`Creating ${postsToCreate.length} new visual posts for user ${userId}`);
-            postsToCreate.forEach(post => {
-              this.createVisualPost(post, diorama);
-            });
-          }
-        });
-      } else {
-        console.error('Invalid posts response format:', result);
+      const response = await makeAuthenticatedRequest('/api/posts');
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+      const posts = await response.json();
+      // Sort posts by createdAt descending
+      this.allPosts = posts.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+      console.log('Loaded all posts:', this.allPosts.length);
     } catch (error) {
       console.error('Error loading posts:', error);
     }
@@ -3142,33 +2924,48 @@ export class Home {
 
   // Add method to save object position
   async saveObjectPosition(object) {
-    if (!object || !object.userData) return;
-    
+    const dioramaId = object.dioramaId;
+    if (!dioramaId) {
+      console.error('Attempted to save object position for an object without dioramaId', object);
+      return;
+    }
+
+    const diorama = this.dioramas.children.find(d => d.userData.id === dioramaId);
+    if (!diorama) {
+      console.error('Diorama not found for ID:', dioramaId);
+      return;
+    }
+
+    const userId = diorama.userData.userId;
+    if (!userId) {
+      console.error('User ID not found for diorama:', dioramaId);
+      return;
+    }
+
+    const objectState = {
+      name: object.name,
+      position: object.position.toArray(),
+      rotation: object.rotation.toArray(),
+      scale: object.scale.toArray(),
+      variation: object.userData.variation // Save selected variation
+    };
+
     try {
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/character', {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          objectId: object.userData.objectId,
-          position: {
-            x: object.position.x,
-            y: object.position.y,
-            z: object.position.z
-          }
-        })
-      });
-      
+      const response = await makeAuthenticatedRequest(`/api/users/${userId}/character`, 'PUT', { character: { objects: [objectState] } });
+
       if (!response.ok) {
-        throw new Error('Failed to save object position');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      // Show success notification
-      this.showNotification('Object position saved successfully!', 'success');
+      const updatedUser = await response.json();
+      console.log('Object position saved:', updatedUser);
+
+      // Update the local character data in localStorage if it's the current user
+      const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+      if (currentUser && currentUser._id === userId) {
+        localStorage.setItem('currentUser', JSON.stringify(updatedUser));
+      }
     } catch (error) {
       console.error('Error saving object position:', error);
-      this.showNotification('Failed to save object position', 'error');
     }
   }
 
