@@ -34,7 +34,7 @@ export class AuthStatus {
         return;
       }
       
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/verify');
+      const response = await makeAuthenticatedRequest('/api/users/verify');
       if (response.ok) {
         this.setLoggedIn();
       } else {
