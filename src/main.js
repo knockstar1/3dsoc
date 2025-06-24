@@ -9,6 +9,7 @@ import { Notifications } from './pages/Notifications';
 class App {
   constructor() {
     console.log('Initializing App');
+    console.log('VITE_APP_API_BASE_URL:', import.meta.env.VITE_APP_API_BASE_URL);
     
     this.scene = new THREE.Scene();
     this.scene.background = new THREE.Color(0x000000);
