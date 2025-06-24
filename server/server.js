@@ -22,10 +22,18 @@ const app = express();
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   const pathToDist = path.resolve(__dirname, '..', 'dist');
+
+  // Explicitly serve index.html for the root path
+  app.get('/', (req, res) => {
+    res.sendFile(path.join(pathToDist, 'index.html'));
+  });
+
+  // Serve other static assets
   app.use(express.static(pathToDist));
 
+  // Catch-all for client-side routing (any other path that isn't a static file or API route)
   app.get('*', (req, res) => {
-    res.sendFile(path.resolve(pathToDist, 'index.html'));
+    res.sendFile(path.join(pathToDist, 'index.html'));
   });
 }
 
