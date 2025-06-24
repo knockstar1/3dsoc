@@ -163,7 +163,7 @@ export class Notifications {
 
   async loadNotifications() {
     try {
-      const response = await makeAuthenticatedRequest('/api/notifications');
+      const response = await makeAuthenticatedRequest('api/notifications');
       if (!response.ok) {
         throw new Error('Failed to load notifications');
       }
@@ -527,7 +527,7 @@ export class Notifications {
   
   async fetchPostDetails(postId) {
     try {
-      const response = await makeAuthenticatedRequest(`/api/posts/${postId}`);
+      const response = await makeAuthenticatedRequest(`api/posts/${postId}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -540,7 +540,7 @@ export class Notifications {
 
   async markAsRead(notificationId) {
     try {
-      const response = await makeAuthenticatedRequest(`/api/notifications/${notificationId}/read`, 'PUT');
+      const response = await makeAuthenticatedRequest(`api/notifications/${notificationId}/read`, 'PUT');
       if (!response.ok) {
         throw new Error(`Failed to mark notification ${notificationId} as read`);
       }
@@ -553,7 +553,7 @@ export class Notifications {
 
   async deleteNotification(notificationId) {
     try {
-      const response = await makeAuthenticatedRequest(`/api/notifications/${notificationId}`, 'DELETE');
+      const response = await makeAuthenticatedRequest(`api/notifications/${notificationId}`, 'DELETE');
       if (!response.ok) {
         throw new Error(`Failed to delete notification ${notificationId}`);
       }
