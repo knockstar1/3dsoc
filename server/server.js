@@ -19,7 +19,19 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const app = express();
 
-// Middleware
+// Serve static files in production (MOVED HERE - before general middleware and API routes)
+if (process.env.NODE_ENV === 'production') {
+  const pathToDist = path.resolve(__dirname, '..', 'dist');
+  console.log(`Render Path to dist: ${pathToDist}`);
+
+  // Catch-all for client-side routing (serves index.html for all unmatched routes)
+  app.get('*', (req, res) => {
+    console.log(`Catch-all for frontend hit: ${req.url}`);
+    res.sendFile(path.join(pathToDist, 'index.html'));
+  });
+}
+
+// Middleware (now after static file serving)
 app.use(express.json());
 app.use(cors({
   origin: [
@@ -43,25 +55,10 @@ mongoose.connect(process.env.MONGODB_URI, {
 
 // Routes
 app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/notifications', notificationRoutes);
-
-// Serve static files in production (MOVED HERE - after API routes)
-if (process.env.NODE_ENV === 'production') {
-  const pathToDist = path.resolve(__dirname, '..', 'dist');
-  console.log(`Serving static files from: ${pathToDist}`);
-
-  // Serve static assets from the dist folder
-  app.use(express.static(pathToDist));
-
-  // Catch-all for client-side routing (any path not matched by static files or API routes)
-  app.get('*', (req, res) => {
-    console.log(`Catch-all route hit for: ${req.url}`);
-    res.sendFile(path.join(pathToDist, 'index.html'));
-  });
-}
+// app.use('/api/users', userRoutes);
+// app.use('/api/posts', postRoutes);
+// app.use('/api/messages', messageRoutes);
+// app.use('/api/notifications', notificationRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {
