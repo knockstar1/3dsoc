@@ -8,8 +8,12 @@
 export async function makeAuthenticatedRequest(url, method = 'GET', data = null) {
     const token = localStorage.getItem('token');
     
+    // Dynamically determine the base API URL
+    const BASE_API_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:5000';
+    const fullUrl = `${BASE_API_URL}${url}`;
+
     // Enhanced logging of API requests
-    console.log(`Making ${method} request to ${url}` + (data ? ' with data' : ' without data'));
+    console.log(`Making ${method} request to ${fullUrl}` + (data ? ' with data' : ' without data'));
     if (data) {
         console.log('Request data preview:', JSON.stringify(data).substring(0, 100) + (JSON.stringify(data).length > 100 ? '...' : ''));
     }
@@ -36,13 +40,13 @@ export async function makeAuthenticatedRequest(url, method = 'GET', data = null)
     }
     
     try {
-        const response = await fetch(url, options);
+        const response = await fetch(fullUrl, options);
         
-        console.log(`API request to ${url} ${response.ok ? 'successful' : 'failed'} with status ${response.status}`);
+        console.log(`API request to ${fullUrl} ${response.ok ? 'successful' : 'failed'} with status ${response.status}`);
         
         return response;
     } catch (error) {
-        console.error(`API request to ${url} failed with error:`, error);
+        console.error(`API request to ${fullUrl} failed with error:`, error);
         throw error;
     }
 } 
