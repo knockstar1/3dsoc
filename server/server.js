@@ -19,24 +19,6 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const app = express();
 
-// Serve static files in production
-if (process.env.NODE_ENV === 'production') {
-  const pathToDist = path.resolve(__dirname, '..', 'dist');
-
-  // Explicitly serve index.html for the root path
-  app.get('/', (req, res) => {
-    res.sendFile(path.join(pathToDist, 'index.html'));
-  });
-
-  // Serve other static assets
-  app.use(express.static(pathToDist));
-
-  // Catch-all for client-side routing (any other path that isn't a static file or API route)
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(pathToDist, 'index.html'));
-  });
-}
-
 // Middleware
 app.use(express.json());
 app.use(cors({
@@ -65,6 +47,17 @@ app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/messages', messageRoutes);
 app.use('/api/notifications', notificationRoutes);
+
+// Serve static files in production (MOVED HERE - after API routes)
+if (process.env.NODE_ENV === 'production') {
+  const pathToDist = path.resolve(__dirname, '..', 'dist');
+  // Serve static assets from the dist folder
+  app.use(express.static(pathToDist));
+  // Catch-all for client-side routing (any path not matched by static files or API routes)
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(pathToDist, 'index.html'));
+  });
+}
 
 // Error handling middleware
 app.use((err, req, res, next) => {
