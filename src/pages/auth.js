@@ -6,6 +6,13 @@ export class Auth {
         this.init();
     }
 
+    // Dynamically determine the base API URL for auth-related calls
+    // This is separate from makeAuthenticatedRequest as these might be unauthenticated
+    // or require specific header handling for initial token exchange.
+    static get BASE_API_URL() {
+        return import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:5000';
+    }
+
     init() {
         // Hide auth modal and character creation UI initially
         const authModal = document.getElementById('auth-modal');
@@ -35,7 +42,7 @@ export class Auth {
                     // Clear storage before attempting to login
                     this.clearLocalStorage();
                     
-                    const response = await fetch('http://localhost:5000/api/users/login', {
+                    const response = await fetch(`${Auth.BASE_API_URL}/api/users/login`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
@@ -78,7 +85,7 @@ export class Auth {
                     }
                     
                     // Verify token before proceeding
-                    const verifyResponse = await fetch('http://localhost:5000/api/users/verify', {
+                    const verifyResponse = await fetch(`${Auth.BASE_API_URL}/api/users/verify`, {
                         headers: {
                             'Authorization': `Bearer ${data.token}`
                         }
@@ -119,7 +126,7 @@ export class Auth {
                     // Clear storage before registration
                     this.clearLocalStorage();
                     
-                    const response = await fetch('http://localhost:5000/api/users/register', {
+                    const response = await fetch(`${Auth.BASE_API_URL}/api/users/register`, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json'
