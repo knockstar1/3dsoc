@@ -20,7 +20,6 @@ router.post('/login', loginUser);
 router.get('/verify', auth, verifyToken);
 router.get('/character', auth, getCharacter);
 router.put('/character', auth, updateCharacter);
-router.get('/', auth, getAllUsers);
 
 // Get all users
 router.get('/', auth, async (req, res) => {
