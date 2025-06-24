@@ -20,16 +20,16 @@ dotenv.config({ path: path.resolve(__dirname, '.env') });
 const app = express();
 
 // Serve static files in production (MOVED HERE - before general middleware and API routes)
-// if (process.env.NODE_ENV === 'production') {
-//   const pathToDist = path.resolve(__dirname, '..', 'dist');
-//   console.log(`Render Path to dist: ${pathToDist}`);
+if (process.env.NODE_ENV === 'production') {
+  const pathToDist = path.resolve(__dirname, '..', 'dist');
+  console.log(`Render Path to dist: ${pathToDist}`);
 
-//   // Catch-all for client-side routing (serves index.html for all unmatched routes)
-//   app.get('*', (req, res) => {
-//     console.log(`Catch-all for frontend hit: ${req.url}`);
-//     res.sendFile(path.join(pathToDist, 'index.html'));
-//   });
-// }
+  // Catch-all for client-side routing (serves index.html for all unmatched routes)
+  app.get('*', (req, res) => {
+    console.log(`Catch-all for frontend hit: ${req.url}`);
+    res.sendFile(path.join(pathToDist, 'index.html'));
+  });
+}
 
 // Middleware (now after static file serving)
 app.use(express.json());
