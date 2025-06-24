@@ -163,7 +163,7 @@ export class Notifications {
 
   async loadNotifications() {
     try {
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/notifications');
+      const response = await makeAuthenticatedRequest('/api/notifications');
       if (!response.ok) {
         throw new Error('Failed to load notifications');
       }
@@ -526,40 +526,41 @@ export class Notifications {
   }
   
   async fetchPostDetails(postId) {
-    if (!postId) return null;
-    
     try {
-      const response = await makeAuthenticatedRequest(`http://localhost:5000/api/posts/${postId}`);
+      const response = await makeAuthenticatedRequest(`/api/posts/${postId}`);
       if (!response.ok) {
-        throw new Error('Failed to fetch post details');
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
-      
-      const data = await response.json();
-      return data;
+      return response.json();
     } catch (error) {
-      console.error('Error fetching post details:', error);
-      return null;
+      console.error(`Error fetching post details for ID ${postId}:`, error);
+      throw error;
     }
   }
 
   async markAsRead(notificationId) {
     try {
-      const response = await makeAuthenticatedRequest(
-        `http://localhost:5000/api/notifications/${notificationId}/read`,
-        'PUT'
-      );
+      const response = await makeAuthenticatedRequest(`/api/notifications/${notificationId}/read`, 'PUT');
       if (!response.ok) {
-        throw new Error('Failed to mark notification as read');
+        throw new Error(`Failed to mark notification ${notificationId} as read`);
       }
-      // Update local state
-      const notification = this.notifications.find(n => n._id === notificationId);
-      if (notification) {
-        notification.isRead = true;
-        this.displayNotifications();
-      }
+      return response.json();
     } catch (error) {
-      console.error('Error marking notification as read:', error);
-      this.showError('Failed to mark notification as read');
+      console.error(`Error marking notification ${notificationId} as read:`, error);
+      throw error;
+    }
+  }
+
+  async deleteNotification(notificationId) {
+    try {
+      const response = await makeAuthenticatedRequest(`/api/notifications/${notificationId}`, 'DELETE');
+      if (!response.ok) {
+        throw new Error(`Failed to delete notification ${notificationId}`);
+      }
+      return response.json();
+    } catch (error) {
+      console.error(`Error deleting notification ${notificationId}:`, error);
+      throw error;
     }
   }
 

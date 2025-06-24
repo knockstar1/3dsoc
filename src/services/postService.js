@@ -1,112 +1,91 @@
-import axios from 'axios';
-
-const API_URL = 'http://localhost:5000/api';
+import { makeAuthenticatedRequest } from '../utils/api.js';
 
 class PostService {
   constructor() {
-    this.api = axios.create({
-      baseURL: API_URL,
-      withCredentials: true
-    });
+    // No longer need axios instance as makeAuthenticatedRequest handles it
   }
 
-  // Add auth token to requests
-  setAuthToken(token) {
-    this.api.defaults.headers.common['Authorization'] = `Bearer ${token}`;
-  }
+  // Remove setAuthToken as makeAuthenticatedRequest handles auth
 
   // Get all posts with pagination
   async getPosts(page = 1, limit = 10) {
     try {
-      const response = await this.api.get(`/posts?page=${page}&limit=${limit}`);
-      return response.data;
+      const response = await makeAuthenticatedRequest(`/posts?page=${page}&limit=${limit}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error; // Let makeAuthenticatedRequest handle logging
     }
   }
 
   // Get single post
   async getPost(id) {
     try {
-      const response = await this.api.get(`/posts/${id}`);
-      return response.data;
+      const response = await makeAuthenticatedRequest(`/posts/${id}`);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
   // Create new post
   async createPost(postData) {
     try {
-      const response = await this.api.post('/posts', postData);
-      return response.data;
+      const response = await makeAuthenticatedRequest('/posts', 'POST', postData);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
   // Update post
   async updatePost(id, postData) {
     try {
-      const response = await this.api.put(`/posts/${id}`, postData);
-      return response.data;
+      const response = await makeAuthenticatedRequest(`/posts/${id}`, 'PUT', postData);
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
   // Delete post
   async deletePost(id) {
     try {
-      const response = await this.api.delete(`/posts/${id}`);
-      return response.data;
+      const response = await makeAuthenticatedRequest(`/posts/${id}`, 'DELETE');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
   // Toggle like on post
   async toggleLike(id) {
     try {
-      const response = await this.api.post(`/posts/${id}/like`);
-      return response.data;
+      const response = await makeAuthenticatedRequest(`/posts/${id}/like`, 'POST');
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
   // Add comment to post
   async addComment(id, content) {
     try {
-      const response = await this.api.post(`/posts/${id}/comment`, { content });
-      return response.data;
+      const response = await makeAuthenticatedRequest(`/posts/${id}/comment`, 'POST', { content });
+      if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+      return response.json();
     } catch (error) {
-      throw this.handleError(error);
+      throw error;
     }
   }
 
-  // Error handler
-  handleError(error) {
-    if (error.response) {
-      // Server responded with error
-      return {
-        message: error.response.data.message || 'Server error occurred',
-        status: error.response.status
-      };
-    } else if (error.request) {
-      // Request made but no response
-      return {
-        message: 'No response from server',
-        status: 503
-      };
-    } else {
-      // Request setup error
-      return {
-        message: error.message,
-        status: 500
-      };
-    }
-  }
+  // Remove handleError as makeAuthenticatedRequest handles logging
 }
 
+export default new PostService();
 export default new PostService(); 
