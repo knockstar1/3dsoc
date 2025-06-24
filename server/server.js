@@ -55,10 +55,10 @@ if (process.env.NODE_ENV === 'production') {
   app.use(express.static(pathToDist)); // Serve static assets
 
   // Catch-all for client-side routing (serves index.html for all unmatched routes)
-  // app.get('*', (req, res) => {
-  //   console.log(`Catch-all for frontend hit: ${req.url}`);
-  //   res.sendFile(path.join(pathToDist, 'index.html'));
-  // });
+  app.get('*', (req, res) => {
+    console.log(`Catch-all for frontend hit: ${req.url}`);
+    res.sendFile(path.join(pathToDist, 'index.html'));
+  });
 }
 
 // Error handling middleware

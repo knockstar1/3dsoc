@@ -10,7 +10,7 @@ class PostService {
   // Get all posts with pagination
   async getPosts(page = 1, limit = 10) {
     try {
-      const response = await makeAuthenticatedRequest(`/posts?page=${page}&limit=${limit}`);
+      const response = await makeAuthenticatedRequest(`posts?page=${page}&limit=${limit}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
@@ -21,7 +21,7 @@ class PostService {
   // Get single post
   async getPost(id) {
     try {
-      const response = await makeAuthenticatedRequest(`/posts/${id}`);
+      const response = await makeAuthenticatedRequest(`posts/${id}`);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
@@ -32,7 +32,7 @@ class PostService {
   // Create new post
   async createPost(postData) {
     try {
-      const response = await makeAuthenticatedRequest('/posts', 'POST', postData);
+      const response = await makeAuthenticatedRequest('posts', 'POST', postData);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
@@ -43,7 +43,7 @@ class PostService {
   // Update post
   async updatePost(id, postData) {
     try {
-      const response = await makeAuthenticatedRequest(`/posts/${id}`, 'PUT', postData);
+      const response = await makeAuthenticatedRequest(`posts/${id}`, 'PUT', postData);
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
@@ -54,7 +54,7 @@ class PostService {
   // Delete post
   async deletePost(id) {
     try {
-      const response = await makeAuthenticatedRequest(`/posts/${id}`, 'DELETE');
+      const response = await makeAuthenticatedRequest(`posts/${id}`, 'DELETE');
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
@@ -65,7 +65,7 @@ class PostService {
   // Toggle like on post
   async toggleLike(id) {
     try {
-      const response = await makeAuthenticatedRequest(`/posts/${id}/like`, 'POST');
+      const response = await makeAuthenticatedRequest(`posts/${id}/like`, 'POST');
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
@@ -76,7 +76,7 @@ class PostService {
   // Add comment to post
   async addComment(id, content) {
     try {
-      const response = await makeAuthenticatedRequest(`/posts/${id}/comment`, 'POST', { content });
+      const response = await makeAuthenticatedRequest(`posts/${id}/comment`, 'POST', { content });
       if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
       return response.json();
     } catch (error) {
