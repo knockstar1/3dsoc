@@ -644,7 +644,7 @@ export class CharacterCreator {
 
       // Load current user's character from database
       console.log('Fetching character from API...');
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/character');
+      const response = await makeAuthenticatedRequest('/api/users/character');
       
       if (!response.ok) {
         throw new Error(`Failed to load character from API: ${response.status}`);
@@ -917,11 +917,7 @@ export class CharacterCreator {
     
     try {
       // Save to API
-      const response = await makeAuthenticatedRequest(
-        'http://localhost:5000/api/users/character',
-        'PUT',
-        characterData
-      );
+      const response = await makeAuthenticatedRequest('/api/users/character', 'PUT', { character: characterData });
       
       if (response.ok) {
         console.log('Character saved to API successfully');
