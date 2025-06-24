@@ -25,10 +25,10 @@ if (process.env.NODE_ENV === 'production') {
   console.log(`Render Path to dist: ${pathToDist}`);
 
   // Catch-all for client-side routing (serves index.html for all unmatched routes)
-  app.get('*', (req, res) => {
-    console.log(`Catch-all for frontend hit: ${req.url}`);
-    res.sendFile(path.join(pathToDist, 'index.html'));
-  });
+  // app.get('*', (req, res) => {
+  //   console.log(`Catch-all for frontend hit: ${req.url}`);
+  //   res.sendFile(path.join(pathToDist, 'index.html'));
+  // });
 }
 
 // Middleware (now after static file serving)
