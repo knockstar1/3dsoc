@@ -149,23 +149,6 @@ async function startServer() {
       
       console.log('✓ Frontend routes added');
       
-      // Catch-all for any other routes (SPA fallback)
-      app.get('*', (req, res) => {
-        // Only handle non-API routes
-        if (!req.path.startsWith('/api/')) {
-          try {
-            const indexPath = path.join(pathToDist, 'index.html');
-            console.log(`Serving index.html for SPA route: ${req.path}`);
-            res.sendFile(indexPath);
-          } catch (error) {
-            console.error(`Error serving index.html for ${req.path}:`, error);
-            res.status(500).send('Error loading page');
-          }
-        } else {
-          res.status(404).json({ message: 'API endpoint not found' });
-        }
-      });
-      
     } catch (error) {
       console.error('Error setting up static files:', error);
       process.exit(1);
@@ -176,6 +159,12 @@ async function startServer() {
   app.use((err, req, res, next) => {
     console.error('Error:', err);
     res.status(500).json({ message: 'Server error' });
+  });
+
+  // 404 handler for any unmatched routes
+  app.use((req, res) => {
+    console.log('404 - Route not found:', req.path);
+    res.status(404).json({ message: 'Route not found' });
   });
 
   // Start server
