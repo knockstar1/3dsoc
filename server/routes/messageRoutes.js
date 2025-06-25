@@ -3,13 +3,17 @@ import auth from '../middleware/auth.js';
 import {
   getMessages,
   sendMessage,
-  markAsRead
+  markAsRead,
+  getConversations
 } from '../controllers/messageController.js';
 
 const router = express.Router();
 
 // All routes are protected
 router.use(auth);
+
+// Get conversations (users that current user has messaged with)
+router.get('/', getConversations);
 
 // Get messages between current user and another user
 router.get('/:userId', getMessages);

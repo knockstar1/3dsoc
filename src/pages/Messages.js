@@ -34,8 +34,8 @@ export class Messages {
   async show() {
     console.log('Showing Messages page');
     
-    // Load all users and their messages
-    await this.loadUsers();
+    // Load conversations (users that have been messaged)
+    await this.loadConversations();
     
     // Start animation loop
     this.animate();
@@ -43,23 +43,21 @@ export class Messages {
     this.isActive = true;
   }
 
-  async loadUsers() {
+  async loadConversations() {
     try {
-      const response = await makeAuthenticatedRequest('/api/users');
-      const users = await response.json();
+      const response = await makeAuthenticatedRequest('/api/messages');
+      const conversations = await response.json();
       
-      if (Array.isArray(users)) {
-        // Store all users for search functionality
-        this.allUsers = users.filter(user => 
-          user._id !== JSON.parse(localStorage.getItem('currentUser'))._id
-        );
+      if (Array.isArray(conversations)) {
+        // Store conversations for search functionality
+        this.allUsers = conversations;
         
-        // Display all users initially
+        // Display conversations
         this.displayUsers(this.allUsers);
       }
     } catch (error) {
-      console.error('Error loading users:', error);
-      alert('Failed to load users. Please try again.');
+      console.error('Error loading conversations:', error);
+      alert('Failed to load conversations. Please try again.');
     }
   }
 
@@ -71,7 +69,26 @@ export class Messages {
     users.forEach(user => {
       const chatItem = document.createElement('div');
       chatItem.className = 'chat-item';
-      chatItem.textContent = user.username;
+      
+      // Create username element
+      const usernameDiv = document.createElement('div');
+      usernameDiv.className = 'chat-username';
+      usernameDiv.textContent = user.username;
+      
+      // Create last message preview if available
+      if (user.lastMessage) {
+        const lastMessageDiv = document.createElement('div');
+        lastMessageDiv.className = 'chat-preview';
+        lastMessageDiv.textContent = user.lastMessage.length > 50 
+          ? user.lastMessage.substring(0, 50) + '...' 
+          : user.lastMessage;
+        
+        chatItem.appendChild(usernameDiv);
+        chatItem.appendChild(lastMessageDiv);
+      } else {
+        chatItem.appendChild(usernameDiv);
+      }
+      
       chatItem.onclick = () => this.selectChat(user);
       this.usersList.appendChild(chatItem);
     });

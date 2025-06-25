@@ -72,4 +72,34 @@
 .message.received {
   background-color: #f1f1f1;
   margin-right: auto;
+}
+
+.chat-username {
+  font-weight: bold;
+  font-size: 14px;
+  color: #333;
+  margin-bottom: 4px;
+}
+
+.chat-preview {
+  font-size: 12px;
+  color: #666;
+  font-style: italic;
+  line-height: 1.2;
+}
+
+.chat-item {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.chat-item:hover {
+  background-color: #f5f5f5;
+}
+
+.chat-item.selected {
+  background-color: #e3f2fd;
+  border-left: 4px solid #2196f3;
 } 
