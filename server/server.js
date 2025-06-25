@@ -124,27 +124,49 @@ async function startServer() {
       app.use(express.static(pathToDist));
       console.log('✓ Static files middleware added');
       
-      // Define all frontend routes that should serve index.html
-      const frontendRoutes = [
-        '/',
-        '/character.html',
-        '/messages.html',
-        '/notifications.html',
-        '/index.html'
-      ];
+      // Handle specific frontend routes
+      app.get('/', (req, res) => {
+        try {
+          const indexPath = path.join(pathToDist, 'index.html');
+          console.log('Serving index.html for home route');
+          res.sendFile(indexPath);
+        } catch (error) {
+          console.error('Error serving index.html:', error);
+          res.status(500).send('Error loading page');
+        }
+      });
       
-      // Handle each frontend route explicitly
-      frontendRoutes.forEach(route => {
-        app.get(route, (req, res) => {
-          try {
-            const indexPath = path.join(pathToDist, 'index.html');
-            console.log(`Serving index.html for route: ${route}`);
-            res.sendFile(indexPath);
-          } catch (error) {
-            console.error(`Error serving index.html for ${route}:`, error);
-            res.status(500).send('Error loading page');
-          }
-        });
+      app.get('/character.html', (req, res) => {
+        try {
+          const characterPath = path.join(pathToDist, 'character.html');
+          console.log('Serving character.html');
+          res.sendFile(characterPath);
+        } catch (error) {
+          console.error('Error serving character.html:', error);
+          res.status(500).send('Error loading page');
+        }
+      });
+      
+      app.get('/messages.html', (req, res) => {
+        try {
+          const messagesPath = path.join(pathToDist, 'messages.html');
+          console.log('Serving messages.html');
+          res.sendFile(messagesPath);
+        } catch (error) {
+          console.error('Error serving messages.html:', error);
+          res.status(500).send('Error loading page');
+        }
+      });
+      
+      app.get('/notifications.html', (req, res) => {
+        try {
+          const notificationsPath = path.join(pathToDist, 'notifications.html');
+          console.log('Serving notifications.html');
+          res.sendFile(notificationsPath);
+        } catch (error) {
+          console.error('Error serving notifications.html:', error);
+          res.status(500).send('Error loading page');
+        }
       });
       
       console.log('✓ Frontend routes added');
