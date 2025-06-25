@@ -337,7 +337,7 @@ export class Home {
     // Get fresh character data directly from the character API endpoint
     let freshCharacterData = null;
     try {
-      const characterResponse = await makeAuthenticatedRequest('http://localhost:5000/api/users/character');
+      const characterResponse = await makeAuthenticatedRequest('api/users/character');
       if (characterResponse.ok) {
         const responseData = await characterResponse.json();
         console.log('Successfully loaded character response from API:', responseData);
@@ -657,8 +657,8 @@ export class Home {
         return null;
       }
       const data = await response.json();
-      this.currentUser = data.user;
-      localStorage.setItem('currentUser', JSON.stringify(data.user));
+      this.currentUser = data; // Fix: data contains user info directly, not data.user
+      localStorage.setItem('currentUser', JSON.stringify(data));
       console.log('User authenticated:', this.currentUser);
       return this.currentUser;
     } catch (error) {
@@ -1109,7 +1109,7 @@ export class Home {
       console.log('Sending post data:', postData);
       
       // Create post in database
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/posts', 'POST', postData);
+      const response = await makeAuthenticatedRequest('api/posts', 'POST', postData);
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -2176,7 +2176,7 @@ export class Home {
       
       // Make API request to delete post
       const response = await makeAuthenticatedRequest(
-        `http://localhost:5000/api/posts/${postId}`,
+        `api/posts/${postId}`,
         'DELETE'
       );
       

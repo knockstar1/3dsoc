@@ -114,7 +114,7 @@ async function startServer() {
 
   console.log('All API routes mounted successfully');
 
-  // Simple static file serving
+  // Static file serving and frontend routes
   if (process.env.NODE_ENV === 'production') {
     const pathToDist = path.resolve(__dirname, '..', 'dist');
     console.log(`Setting up static files from: ${pathToDist}`);
@@ -124,11 +124,47 @@ async function startServer() {
       app.use(express.static(pathToDist));
       console.log('✓ Static files middleware added');
       
-      // Simple catch-all for SPA
-      app.get('/', (req, res) => {
-        res.sendFile(path.join(pathToDist, 'index.html'));
+      // Define all frontend routes that should serve index.html
+      const frontendRoutes = [
+        '/',
+        '/character.html',
+        '/messages.html',
+        '/notifications.html',
+        '/index.html'
+      ];
+      
+      // Handle each frontend route explicitly
+      frontendRoutes.forEach(route => {
+        app.get(route, (req, res) => {
+          try {
+            const indexPath = path.join(pathToDist, 'index.html');
+            console.log(`Serving index.html for route: ${route}`);
+            res.sendFile(indexPath);
+          } catch (error) {
+            console.error(`Error serving index.html for ${route}:`, error);
+            res.status(500).send('Error loading page');
+          }
+        });
       });
-      console.log('✓ Root route added');
+      
+      console.log('✓ Frontend routes added');
+      
+      // Catch-all for any other routes (SPA fallback)
+      app.get('*', (req, res) => {
+        // Only handle non-API routes
+        if (!req.path.startsWith('/api/')) {
+          try {
+            const indexPath = path.join(pathToDist, 'index.html');
+            console.log(`Serving index.html for SPA route: ${req.path}`);
+            res.sendFile(indexPath);
+          } catch (error) {
+            console.error(`Error serving index.html for ${req.path}:`, error);
+            res.status(500).send('Error loading page');
+          }
+        } else {
+          res.status(404).json({ message: 'API endpoint not found' });
+        }
+      });
       
     } catch (error) {
       console.error('Error setting up static files:', error);
