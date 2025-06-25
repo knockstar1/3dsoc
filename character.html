@@ -37,13 +37,22 @@
       flex-direction: column;
       gap: 1rem;
     }
-    .part-selector {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
+    .part-control {
+      margin-bottom: 1rem;
+    }
+    .part-control h3 {
+      margin: 0 0 0.5rem 0;
+      color: #004d00;
+      font-size: 14px;
+      text-align: center;
+    }
+    .control-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       gap: 0.5rem;
     }
-    .character-controls button {
-      margin: 5px;
+    .arrow {
       padding: 8px 12px;
       cursor: pointer;
       border: none;
@@ -52,54 +61,24 @@
       color: #004d00;
       font-weight: bold;
       transition: all 0.2s ease;
+      font-size: 16px;
+      min-width: 40px;
     }
-    .character-controls button:hover {
+    .arrow:hover {
       background-color: #b3ffb3;
       transform: translateY(-2px);
     }
-    .character-controls button.active {
-      background-color: #00cc00;
-      color: white;
-    }
-    .variation-controls {
-      display: flex;
-      flex-direction: column;
-      gap: 1rem;
-    }
-    .variation-buttons {
-      display: grid;
-      grid-template-columns: repeat(3, 1fr);
-      gap: 0.5rem;
-    }
-    .variation-button {
-      aspect-ratio: 1;
-      padding: 0;
-      background: #f0f0f0;
-      border: 2px solid #ddd;
-    }
-    .variation-button:hover {
-      border-color: #00cc00;
-    }
-    .variation-button.active {
-      border-color: #00cc00;
-      background: #d4ffd4;
-    }
-    .color-picker {
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      gap: 0.5rem;
-    }
-    .color-picker label {
-      color: #004d00;
-      font-weight: bold;
-    }
-    .color-picker input[type="color"] {
-      width: 100%;
+    .color-box {
+      width: 40px;
       height: 40px;
-      border: none;
+      border: 2px solid #004d00;
       border-radius: 4px;
       cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .color-box:hover {
+      transform: scale(1.1);
+      border-width: 3px;
     }
     .accept-button {
       background-color: #00cc00 !important;
@@ -162,27 +141,64 @@
 
   <div class="character-creation">
     <div class="character-controls">
-      <div class="part-selector">
-        <button class="part-button active" data-part="head">Head</button>
-        <button class="part-button" data-part="teeth">Teeth</button>
-        <button class="part-button" data-part="shirt">Shirt</button>
-        <button class="part-button" data-part="belt">Belt</button>
-        <button class="part-button" data-part="pants">Pants</button>
-        <button class="part-button" data-part="shoes">Shoes</button>
-      </div>
-      <div class="variation-controls">
-        <div class="part-title">Select Variation</div>
-        <div class="variation-buttons">
-          <button class="variation-button" data-variation="0">1</button>
-          <button class="variation-button" data-variation="1">2</button>
-          <button class="variation-button" data-variation="2">3</button>
-          <button class="variation-button" data-variation="3">4</button>
-          <button class="variation-button" data-variation="4">5</button>
+      <!-- Head Controls -->
+      <div class="part-control" data-part="head">
+        <h3>Head</h3>
+        <div class="control-row">
+          <button class="arrow left" data-part="head">◀</button>
+          <div class="color-box" data-part="head"></div>
+          <button class="arrow right" data-part="head">▶</button>
         </div>
       </div>
-      <div class="color-picker">
-        <label for="color-input">Color</label>
-        <input type="color" id="color-input" value="#4a90e2">
+      
+      <!-- Teeth Controls -->
+      <div class="part-control" data-part="teeth">
+        <h3>Teeth</h3>
+        <div class="control-row">
+          <button class="arrow left" data-part="teeth">◀</button>
+          <div class="color-box" data-part="teeth"></div>
+          <button class="arrow right" data-part="teeth">▶</button>
+        </div>
+      </div>
+      
+      <!-- Shirt Controls -->
+      <div class="part-control" data-part="shirt">
+        <h3>Shirt</h3>
+        <div class="control-row">
+          <button class="arrow left" data-part="shirt">◀</button>
+          <div class="color-box" data-part="shirt"></div>
+          <button class="arrow right" data-part="shirt">▶</button>
+        </div>
+      </div>
+      
+      <!-- Belt Controls -->
+      <div class="part-control" data-part="belt">
+        <h3>Belt</h3>
+        <div class="control-row">
+          <button class="arrow left" data-part="belt">◀</button>
+          <div class="color-box" data-part="belt"></div>
+          <button class="arrow right" data-part="belt">▶</button>
+        </div>
+      </div>
+      
+      <!-- Pants Controls -->
+      <div class="part-control" data-part="pants">
+        <h3>Pants</h3>
+        <div class="control-row">
+          <button class="arrow left" data-part="pants">◀</button>
+          <div class="color-box" data-part="pants"></div>
+          <button class="arrow right" data-part="pants">▶</button>
+        </div>
+      </div>
+      
+      <!-- Shoes Controls -->
+      <div class="part-control" data-part="shoes">
+        <h3>Shoes</h3>
+        <div class="control-row">
+          <button class="arrow left" data-part="shoes">◀</button>
+          <div class="color-box" data-part="shoes"></div>
+          <button class="arrow right" data-part="shoes">▶</button>
+        </div>
       </div>
       
       <!-- Add bio toggle button -->
@@ -228,7 +244,7 @@
     // Load existing character data
     async function loadCharacter() {
       try {
-        const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/character');
+        const response = await makeAuthenticatedRequest('/api/users/character');
         const userData = await response.json();
         
         if (userData) {
@@ -239,9 +255,11 @@
             console.log('Found character data, loading variations:', userData.character.variations);
             await creator.loadCharacter(userData.character);
             console.log('Character loaded successfully');
+            updateColorBoxes(); // Initialize color boxes after loading
           } else {
             console.log('Valid API response but no character variations found');
             creator.createDefaultCharacter();
+            updateColorBoxes(); // Initialize color boxes after creating default
           }
           
           // Load bio if available
@@ -264,6 +282,7 @@
         if (users[currentUser.username]?.character) {
           console.log('Loading character from localStorage');
           await creator.loadCharacter(users[currentUser.username].character);
+          updateColorBoxes(); // Initialize color boxes after loading from localStorage
           
           // Try to load bio from localStorage
           if (currentUser.bio) {
@@ -273,6 +292,7 @@
         } else {
           console.log('No character found in localStorage, creating default character');
           creator.createDefaultCharacter();
+          updateColorBoxes(); // Initialize color boxes after creating default
         }
       }
     }
@@ -280,42 +300,62 @@
     // Load character immediately
     loadCharacter();
 
-    let activePart = 'head';
+    // UI Handlers for arrow controls and color boxes
+    document.querySelectorAll('.arrow').forEach(btn => {
+      btn.addEventListener('click', (e) => {
+        const part = e.target.dataset.part;
+        const direction = e.target.classList.contains('left') ? -1 : 1;
+        
+        if (creator.variations[part]) {
+          const count = creator.variations[part].length;
+          const current = creator.currentVariations[part] || 0;
+          
+          // Calculate new index
+          let newIndex = (current + direction) % count;
+          if (newIndex < 0) newIndex = count - 1;
+          
+          // Store new index
+          creator.currentVariations[part] = newIndex;
+          console.log(`Cycling ${part} to variation ${newIndex}`);
+          
+          // Update character immediately
+          creator.updateCharacter();
+        }
+      });
+    });
 
-    function updateVariationButtons() {
-      const currentVariation = creator.currentVariations[activePart];
-      document.querySelectorAll('.variation-button').forEach(btn => {
-        btn.classList.toggle('active', parseInt(btn.dataset.variation) === currentVariation);
+    // Color box controls
+    document.querySelectorAll('.color-box').forEach(box => {
+      box.addEventListener('click', (e) => {
+        const part = e.target.dataset.part;
+        
+        const colorSets = {
+          head: [0xffcc99, 0xe6b89c, 0xffe0bd, 0xd1a579, 0x8d5524],
+          teeth: [0xffffff, 0xfffafa, 0xf0f8ff, 0xf5f5f5],
+          shirt: [0x0000ff, 0xff0000, 0x00ff00, 0xffff00, 0xff00ff],
+          belt: [0x000000, 0x696969, 0x808080, 0xa9a9a9],
+          pants: [0x000080, 0x404040, 0x808080, 0x4169e1, 0x800000],
+          shoes: [0x222222, 0x3d3d3d, 0x595959, 0x666666]
+        };
+
+        const colors = colorSets[part];
+        const currentIndex = colors.indexOf(creator.colors[part]);
+        const nextIndex = (currentIndex + 1) % colors.length;
+        creator.colors[part] = colors[nextIndex];
+
+        // Update color box display
+        box.style.backgroundColor = '#' + creator.colors[part].toString(16).padStart(6, '0');
+        creator.updateCharacter();
+      });
+    });
+
+    // Initialize color boxes
+    function updateColorBoxes() {
+      document.querySelectorAll('.color-box').forEach(box => {
+        const part = box.dataset.part;
+        box.style.backgroundColor = '#' + creator.colors[part].toString(16).padStart(6, '0');
       });
     }
-
-    // UI Handlers
-    document.querySelectorAll('.part-button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        document.querySelectorAll('.part-button').forEach(b => b.classList.remove('active'));
-        btn.classList.add('active');
-        activePart = btn.dataset.part;
-        console.log('Selected part:', activePart);
-        // Update color picker to match current part color
-        document.getElementById('color-input').value = '#' + creator.colors[activePart].toString(16).padStart(6, '0');
-        updateVariationButtons();
-      });
-    });
-
-    document.querySelectorAll('.variation-button').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const variation = parseInt(btn.dataset.variation);
-        creator.currentVariations[activePart] = variation;
-        creator.updateCharacter();
-        updateVariationButtons();
-      });
-    });
-
-    document.getElementById('color-input').addEventListener('input', e => {
-      const color = new THREE.Color(e.target.value);
-      creator.colors[activePart] = color.getHex();
-      creator.updateCharacter();
-    });
 
     document.getElementById('accept-character').addEventListener('click', async () => {
       console.log('before editing after saving');
@@ -350,7 +390,7 @@
         console.log('Saving character data:', characterData);
         // Save to database (note: API expects direct variations/colors, not nested)
         const response = await makeAuthenticatedRequest(
-          'http://localhost:5000/api/users/character',
+          '/api/users/character',
           'PUT',
           characterData
         );
@@ -379,8 +419,10 @@
       }
     });
 
-    // Initialize variation buttons
-    updateVariationButtons();
+    // Initialize color boxes after character is loaded
+    setTimeout(() => {
+      updateColorBoxes();
+    }, 1000);
 
     // Add bio toggle button functionality
     document.getElementById('toggle-bio-button').addEventListener('click', () => {

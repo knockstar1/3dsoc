@@ -163,7 +163,7 @@ export class Notifications {
 
   async loadNotifications() {
     try {
-      const response = await makeAuthenticatedRequest('api/notifications');
+      const response = await makeAuthenticatedRequest('/api/notifications');
       if (!response.ok) {
         throw new Error('Failed to load notifications');
       }
