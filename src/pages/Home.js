@@ -2143,6 +2143,14 @@ export class Home {
       z-index: 1001;
     `;
     
+    // Add buttons container
+    const buttonsContainer = document.createElement('div');
+    buttonsContainer.style.cssText = `
+      display: flex;
+      gap: 10px;
+      margin-top: 15px;
+    `;
+    
     // Add edit button if this is the current user
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
     if (currentUser && currentUser._id === userId) {
@@ -2156,7 +2164,7 @@ export class Home {
         border-radius: 5px;
         cursor: pointer;
         font-weight: bold;
-        width: 100%;
+        flex: 1;
         transition: background-color 0.2s;
       `;
       
@@ -2174,8 +2182,46 @@ export class Home {
         window.location.href = 'character.html';
       });
       
-      innerContainer.appendChild(editButton);
+      buttonsContainer.appendChild(editButton);
+    } else {
+      // Add message button for other users
+      const messageButton = document.createElement('button');
+      messageButton.textContent = 'Message';
+      messageButton.style.cssText = `
+        padding: 8px 15px;
+        background-color: rgba(40, 167, 69, 0.8);
+        color: white;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-weight: bold;
+        width: 100%;
+        transition: background-color 0.2s;
+      `;
+      
+      // Hover effect
+      messageButton.addEventListener('mouseover', () => {
+        messageButton.style.backgroundColor = 'rgba(33, 136, 56, 0.8)';
+      });
+      
+      messageButton.addEventListener('mouseout', () => {
+        messageButton.style.backgroundColor = 'rgba(40, 167, 69, 0.8)';
+      });
+      
+      // Redirect to messages page with user pre-selected
+      messageButton.addEventListener('click', () => {
+        // Store the selected user in localStorage for the messages page to pick up
+        localStorage.setItem('selectedMessageUser', JSON.stringify({
+          _id: userId,
+          username: userName
+        }));
+        window.location.href = 'messages.html';
+      });
+      
+      buttonsContainer.appendChild(messageButton);
     }
+    
+    innerContainer.appendChild(buttonsContainer);
     
     // Add elements to inner container
     innerContainer.appendChild(usernameElement);
@@ -2699,8 +2745,8 @@ export class Home {
     
     notification.style.cssText = `
       position: fixed;
-      bottom: 20px;
-      right: 20px;
+      bottom: 80px;
+      left: 20px;
       font-family: 'Roboto', sans-serif;
       font-weight: bold;
       z-index: 2000;
@@ -3201,7 +3247,7 @@ export class Home {
     button.style.cssText = `
       position: fixed;
       bottom: 20px;
-      right: 20px;
+      left: 20px;
       padding: 10px 20px;
       background-color: rgba(74, 144, 226, 0.8);
       color: white;

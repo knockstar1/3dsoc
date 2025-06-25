@@ -4,7 +4,8 @@ import {
   getMessages,
   sendMessage,
   markAsRead,
-  getConversations
+  getConversations,
+  deleteMessage
 } from '../controllers/messageController.js';
 
 const router = express.Router();
@@ -23,5 +24,8 @@ router.post('/', sendMessage);
 
 // Mark messages as read
 router.put('/:userId/read', markAsRead);
+
+// Delete a message
+router.delete('/message/:messageId', deleteMessage);
 
 export default router; 

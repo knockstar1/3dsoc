@@ -37,6 +37,9 @@ export class Messages {
     // Load conversations (users that have been messaged)
     await this.loadConversations();
     
+    // Check if a user was pre-selected from the home page
+    this.checkForPreSelectedUser();
+    
     // Start animation loop
     this.animate();
     
@@ -163,6 +166,15 @@ export class Messages {
 
       // Add new messages
       messages.forEach(message => {
+        const messageContainer = document.createElement('div');
+        messageContainer.className = 'message-container';
+        messageContainer.style.cssText = `
+          display: flex;
+          align-items: flex-start;
+          gap: 10px;
+          margin-bottom: 10px;
+        `;
+        
         const messageDiv = document.createElement('div');
         
         // Safely determine if this message was sent by current user
@@ -182,7 +194,72 @@ export class Messages {
         
         messageDiv.className = `message ${isSentByCurrentUser ? 'sent' : 'received'}`;
         messageDiv.textContent = message.content;
-        this.chatContent.insertBefore(messageDiv, this.chatContent.lastElementChild);
+        messageDiv.setAttribute('data-message-id', message._id);
+        
+        // Add delete button for sent messages
+        if (isSentByCurrentUser) {
+          messageContainer.style.flexDirection = 'row-reverse'; // Align to right
+          
+          const deleteButton = document.createElement('button');
+          deleteButton.textContent = '×';
+          deleteButton.className = 'delete-message-btn';
+          deleteButton.style.cssText = `
+            background: rgba(220, 53, 69, 0.8);
+            color: white;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s;
+          `;
+          
+          // Show delete button on hover
+          messageContainer.addEventListener('mouseenter', () => {
+            deleteButton.style.display = 'flex';
+          });
+          
+          messageContainer.addEventListener('mouseleave', () => {
+            deleteButton.style.display = 'none';
+          });
+          
+          // Handle delete click
+          deleteButton.addEventListener('click', async () => {
+            if (confirm('Are you sure you want to delete this message?')) {
+              try {
+                const response = await makeAuthenticatedRequest(
+                  `/api/messages/message/${message._id}`,
+                  'DELETE'
+                );
+                
+                if (response.ok) {
+                  // Remove message from UI
+                  messageContainer.remove();
+                  
+                  // Update local messages state
+                  const messages = this.messages.get(this.currentChat._id) || [];
+                  const updatedMessages = messages.filter(m => m._id !== message._id);
+                  this.messages.set(this.currentChat._id, updatedMessages);
+                } else {
+                  alert('Failed to delete message. Please try again.');
+                }
+              } catch (error) {
+                console.error('Error deleting message:', error);
+                alert('Failed to delete message. Please try again.');
+              }
+            }
+          });
+          
+          messageContainer.appendChild(deleteButton);
+        }
+        
+        messageContainer.appendChild(messageDiv);
+        this.chatContent.insertBefore(messageContainer, this.chatContent.lastElementChild);
       });
 
       // Scroll to bottom
@@ -235,6 +312,34 @@ export class Messages {
     
     requestAnimationFrame(this.animate.bind(this));
     this.renderer.render(this.scene, this.camera);
+  }
+
+  checkForPreSelectedUser() {
+    const selectedUser = localStorage.getItem('selectedMessageUser');
+    if (selectedUser) {
+      try {
+        const user = JSON.parse(selectedUser);
+        console.log('Pre-selected user found:', user);
+        
+        // Remove from localStorage so it doesn't persist
+        localStorage.removeItem('selectedMessageUser');
+        
+        // Check if this user is already in our conversations
+        const existingUser = this.allUsers.find(u => u._id === user._id);
+        if (existingUser) {
+          // User exists in conversations, select them
+          this.selectChat(existingUser);
+        } else {
+          // User not in conversations yet, add them and select
+          this.allUsers.unshift(user); // Add to beginning of list
+          this.displayUsers(this.allUsers);
+          this.selectChat(user);
+        }
+      } catch (error) {
+        console.error('Error parsing pre-selected user:', error);
+        localStorage.removeItem('selectedMessageUser');
+      }
+    }
   }
 
   hide() {

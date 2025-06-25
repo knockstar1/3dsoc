@@ -120,4 +120,30 @@ export const markAsRead = async (req, res) => {
     console.error('Error marking messages as read:', error);
     res.status(500).json({ message: 'Error marking messages as read' });
   }
+};
+
+// Delete a message
+export const deleteMessage = async (req, res) => {
+  try {
+    const messageId = req.params.messageId;
+    
+    // Find the message and check if user is the sender
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({ message: 'Message not found' });
+    }
+    
+    // Only allow sender to delete their own messages
+    if (message.sender.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'You can only delete your own messages' });
+    }
+    
+    await Message.findByIdAndDelete(messageId);
+    
+    res.json({ message: 'Message deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting message:', error);
+    res.status(500).json({ message: 'Error deleting message' });
+  }
 }; 
