@@ -2995,19 +2995,24 @@ export class Home {
       color: 0xffffff,
       size: 0.15,
       transparent: true,
-      opacity: 0.8
+      opacity: 0.8,
+      depthTest: true,
+      depthWrite: false
     });
     
     const starsVertices = [];
     for (let i = 0; i < 2000; i++) {
       const x = (Math.random() - 0.5) * 150;
       const y = (Math.random() - 0.5) * 150;
-      const z = (Math.random() - 0.5) * 150;
+      // Keep stars behind dioramas - dioramas are at z: -dioramaDepth (around -5)
+      // So put stars between -20 and -100 to stay behind
+      const z = -20 - (Math.random() * 80); // Range: -20 to -100
       starsVertices.push(x, y, z);
     }
     
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
     this.stars = new THREE.Points(starsGeometry, starsMaterial);
+    this.stars.renderOrder = -1; // Render stars first (behind everything)
     this.scene.add(this.stars);
     
     // Add some colored stars
@@ -3017,7 +3022,8 @@ export class Home {
     for (let i = 0; i < 300; i++) {
       const x = (Math.random() - 0.5) * 150;
       const y = (Math.random() - 0.5) * 150;
-      const z = (Math.random() - 0.5) * 150;
+      // Keep colored stars even further back
+      const z = -30 - (Math.random() * 70); // Range: -30 to -100
       coloredStarsVertices.push(x, y, z);
     }
     
@@ -3025,13 +3031,32 @@ export class Home {
     
     // Create multiple colored star systems
     const coloredStarMaterials = [
-      new THREE.PointsMaterial({ color: 0x4a90e2, size: 0.2, transparent: true }),
-      new THREE.PointsMaterial({ color: 0xff9966, size: 0.25, transparent: true }),
-      new THREE.PointsMaterial({ color: 0x66ffcc, size: 0.2, transparent: true })
+      new THREE.PointsMaterial({ 
+        color: 0x4a90e2, 
+        size: 0.2, 
+        transparent: true,
+        depthTest: true,
+        depthWrite: false
+      }),
+      new THREE.PointsMaterial({ 
+        color: 0xff9966, 
+        size: 0.25, 
+        transparent: true,
+        depthTest: true,
+        depthWrite: false
+      }),
+      new THREE.PointsMaterial({ 
+        color: 0x66ffcc, 
+        size: 0.2, 
+        transparent: true,
+        depthTest: true,
+        depthWrite: false
+      })
     ];
     
     coloredStarMaterials.forEach(material => {
       const coloredStars = new THREE.Points(coloredStarsGeometry.clone(), material);
+      coloredStars.renderOrder = -1; // Render behind everything
       this.scene.add(coloredStars);
       
       // Add some random rotation
