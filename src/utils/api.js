@@ -10,7 +10,11 @@ export async function makeAuthenticatedRequest(url, method = 'GET', data = null)
     
     // Dynamically determine the base API URL
     const BASE_API_URL = import.meta.env.VITE_APP_API_BASE_URL || 'http://localhost:5000';
-    const fullUrl = `${BASE_API_URL}${url}`;
+    
+    // Fix double slash issue by normalizing base URL and path
+    const normalizedBaseUrl = BASE_API_URL.replace(/\/+$/, ''); // Remove trailing slashes
+    const normalizedPath = url.startsWith('/') ? url : `/${url}`; // Ensure path starts with /
+    const fullUrl = `${normalizedBaseUrl}${normalizedPath}`;
 
     // Enhanced logging of API requests
     console.log(`Making ${method} request to ${fullUrl}` + (data ? ' with data' : ' without data'));
