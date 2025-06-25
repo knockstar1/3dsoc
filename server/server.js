@@ -15,6 +15,7 @@ import notificationRoutes from './routes/notificationRoutes.js';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Load environment variables
 dotenv.config({ path: path.resolve(__dirname, '.env') });
 
 const app = express();
@@ -33,20 +34,41 @@ app.use(cors({
   optionsSuccessStatus: 200
 }));
 
+// Ensure required environment variables are set with fallbacks
+const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/3d-social';
+const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const PORT = process.env.PORT || 5000;
+
+console.log('Starting server with configuration:');
+console.log('- Node Environment:', process.env.NODE_ENV || 'development');
+console.log('- Port:', PORT);
+console.log('- MongoDB URI:', MONGODB_URI.replace(/\/\/[^:]+:[^@]+@/, '//***:***@')); // Hide credentials
+console.log('- JWT Secret:', JWT_SECRET ? '[SET]' : '[NOT SET]');
+
 // Connect to MongoDB
-mongoose.connect(process.env.MONGODB_URI, {
+mongoose.connect(MONGODB_URI, {
   useNewUrlParser: true,
   useUnifiedTopology: true
 })
-  .then(() => console.log('Connected to MongoDB'))
-  .catch(err => console.error('MongoDB connection error:', err));
+  .then(() => console.log('Connected to MongoDB successfully'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1); // Exit if can't connect to database
+  });
 
-// Routes
-app.use('/api/auth', authRoutes);
-app.use('/api/users', userRoutes);
-app.use('/api/posts', postRoutes);
-app.use('/api/messages', messageRoutes);
-app.use('/api/notifications', notificationRoutes);
+// Routes with error handling
+try {
+  console.log('Mounting API routes...');
+  app.use('/api/auth', authRoutes);
+  app.use('/api/users', userRoutes);
+  app.use('/api/posts', postRoutes);
+  app.use('/api/messages', messageRoutes);
+  app.use('/api/notifications', notificationRoutes);
+  console.log('API routes mounted successfully');
+} catch (error) {
+  console.error('Error mounting routes:', error);
+  process.exit(1);
+}
 
 // Serve static files in production (MOVED HERE - after API routes)
 if (process.env.NODE_ENV === 'production') {
@@ -63,12 +85,23 @@ if (process.env.NODE_ENV === 'production') {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('Express error handler caught:', err.stack);
   res.status(500).json({ message: 'Something went wrong!' });
 });
 
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err, promise) => {
+  console.error('Unhandled Promise Rejection:', err);
+  process.exit(1);
+});
+
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err);
+  process.exit(1);
+});
+
 // Start server
-const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
   console.log(`Server running on port ${PORT}`);
 }); 
