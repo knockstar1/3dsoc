@@ -393,7 +393,7 @@ export class Home {
     // Get current user with most up-to-date data
     try {
       // Always try to get from API first to ensure fresh user data
-      const response = await makeAuthenticatedRequest('http://localhost:5000/api/users/verify');
+      const response = await makeAuthenticatedRequest('api/users/verify');
       if (response.ok) {
         const userData = await response.json();
         this.currentUser = userData;
@@ -649,7 +649,7 @@ export class Home {
 
   async checkAuth() {
     try {
-      const response = await makeAuthenticatedRequest('/api/users/verify');
+      const response = await makeAuthenticatedRequest('api/users/verify');
       if (!response.ok) {
         console.log('Token verification failed or no token.');
         localStorage.removeItem('token');
@@ -2355,7 +2355,7 @@ export class Home {
 
   async loadAllUsers() {
     try {
-      const response = await makeAuthenticatedRequest('/api/users');
+      const response = await makeAuthenticatedRequest('api/users');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -2370,7 +2370,7 @@ export class Home {
 
   async loadUserPosts(userId) {
     try {
-      const response = await makeAuthenticatedRequest(`/api/posts/user/${userId}`);
+      const response = await makeAuthenticatedRequest(`api/posts/user/${userId}`);
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -2412,7 +2412,7 @@ export class Home {
   async handleReaction(postId, reactionType) {
     try {
       const response = await makeAuthenticatedRequest(
-        `/api/posts/${postId}/react`, 
+        `api/posts/${postId}/react`, 
         'POST', 
         { reactionType }
       );
@@ -2469,7 +2469,7 @@ export class Home {
 
   async loadPosts() {
     try {
-      const response = await makeAuthenticatedRequest('/api/posts');
+      const response = await makeAuthenticatedRequest('api/posts');
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
       }
@@ -2951,7 +2951,7 @@ export class Home {
     };
 
     try {
-      const response = await makeAuthenticatedRequest(`/api/users/${userId}/character`, 'PUT', { character: { objects: [objectState] } });
+      const response = await makeAuthenticatedRequest(`api/users/${userId}/character`, 'PUT', { character: { objects: [objectState] } });
 
       if (!response.ok) {
         throw new Error(`HTTP error! status: ${response.status}`);
