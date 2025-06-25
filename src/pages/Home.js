@@ -940,46 +940,116 @@ export class Home {
       if (post.update) post.update();
     });
     
-    // Update star twinkling
-    this.updateStarTwinkling();
+    // Update star physics
+    this.updateStarPhysics();
   }
 
-  updateStarTwinkling() {
-    if (!this.stars || !this.starsTwinkle) return;
+  updateStarPhysics() {
+    if (!this.stars || !this.starParticles) return;
     
-    // Update time
-    this.starsTwinkle.time += 0.016; // Assuming 60fps
+    // Update diorama bounds for collision detection
+    this.updateDioramaBounds();
     
-    // Update main stars twinkling
-    const starsOpacities = this.stars.geometry.attributes.opacity.array;
-    for (let i = 0; i < starsOpacities.length; i++) {
-      const speed = this.starsTwinkle.speeds[i];
-      const phase = this.starsTwinkle.time * speed + i * 0.1;
-      const twinkle = (Math.sin(phase) + 1) * 0.5; // Normalize to 0-1
-      starsOpacities[i] = 0.3 + twinkle * 0.7; // Range: 0.3 to 1.0
+    // Update main star particles
+    const starsPositions = this.stars.geometry.attributes.position.array;
+    for (let i = 0; i < this.starParticles.length; i++) {
+      const particle = this.starParticles[i];
+      
+      // Apply velocity
+      particle.position.add(particle.velocity);
+      
+      // Check collision with dioramas
+      this.checkParticleCollision(particle);
+      
+      // Update geometry positions
+      const index = i * 3;
+      starsPositions[index] = particle.position.x;
+      starsPositions[index + 1] = particle.position.y;
+      starsPositions[index + 2] = particle.position.z;
     }
-    this.stars.geometry.attributes.opacity.needsUpdate = true;
+    this.stars.geometry.attributes.position.needsUpdate = true;
     
-    // Update colored stars twinkling
-    if (this.coloredStars && this.coloredStarsTwinkle) {
+    // Update colored star particles
+    if (this.coloredStars && this.coloredStarParticles) {
       this.coloredStars.forEach((coloredStars, starIndex) => {
-        if (!coloredStars.geometry.attributes.opacity) return;
+        const positions = coloredStars.geometry.attributes.position.array;
         
-        const twinkleData = this.coloredStarsTwinkle[starIndex];
-        twinkleData.time += 0.016;
-        
-        const opacities = coloredStars.geometry.attributes.opacity.array;
-        for (let i = 0; i < opacities.length; i++) {
-          const speed = twinkleData.speeds[i];
-          const phase = twinkleData.time * speed + i * 0.15;
-          const twinkle = (Math.sin(phase) + 1) * 0.5;
-          opacities[i] = 0.4 + twinkle * 0.6; // Range: 0.4 to 1.0
+        for (let i = 0; i < this.coloredStarParticles.length; i++) {
+          const particle = this.coloredStarParticles[i];
+          
+          // Apply velocity
+          particle.position.add(particle.velocity);
+          
+          // Check collision with dioramas
+          this.checkParticleCollision(particle);
+          
+          // Update geometry positions
+          const index = i * 3;
+          positions[index] = particle.position.x;
+          positions[index + 1] = particle.position.y;
+          positions[index + 2] = particle.position.z;
         }
-        coloredStars.geometry.attributes.opacity.needsUpdate = true;
+        
+        coloredStars.geometry.attributes.position.needsUpdate = true;
         
         // Add subtle rotation for more dynamic effect
         coloredStars.rotation.y += 0.0001;
       });
+    }
+  }
+
+  updateDioramaBounds() {
+    this.dioramaBounds = [];
+    
+    this.visibleDioramas.forEach(diorama => {
+      if (!diorama.mesh.visible) return;
+      
+      // Create bounding box for each diorama
+      const box = new THREE.Box3();
+      box.setFromObject(diorama.mesh);
+      
+      // Expand the box slightly for better collision detection
+      box.expandByScalar(1.0);
+      
+      this.dioramaBounds.push(box);
+    });
+  }
+
+  checkParticleCollision(particle) {
+    for (const bounds of this.dioramaBounds) {
+      if (bounds.containsPoint(particle.position)) {
+        // Particle is inside diorama bounds - deflect it
+        const center = bounds.getCenter(new THREE.Vector3());
+        const direction = particle.position.clone().sub(center).normalize();
+        
+        // Move particle to surface of bounding box
+        const closestPoint = bounds.clampPoint(particle.position, new THREE.Vector3());
+        particle.position.copy(closestPoint);
+        
+        // Reflect velocity based on collision normal
+        const normal = direction.clone().normalize();
+        particle.velocity.reflect(normal);
+        
+        // Add some damping to prevent infinite bouncing
+        particle.velocity.multiplyScalar(0.8);
+        
+        break; // Only handle one collision per frame
+      }
+    }
+    
+    // Keep particles within world bounds
+    const worldBounds = 75;
+    if (Math.abs(particle.position.x) > worldBounds) {
+      particle.velocity.x *= -1;
+      particle.position.x = Math.sign(particle.position.x) * worldBounds;
+    }
+    if (Math.abs(particle.position.y) > worldBounds) {
+      particle.velocity.y *= -1;
+      particle.position.y = Math.sign(particle.position.y) * worldBounds;
+    }
+    if (Math.abs(particle.position.z) > worldBounds) {
+      particle.velocity.z *= -1;
+      particle.position.z = Math.sign(particle.position.z) * worldBounds;
     }
   }
 
@@ -3031,119 +3101,89 @@ export class Home {
   }
 
   setupBackground() {
-    // Create a dense starfield background with twinkling effect
+    // Create original style starfield with physics-based collision detection
     const starsGeometry = new THREE.BufferGeometry();
     const starsMaterial = new THREE.PointsMaterial({
       color: 0xffffff,
-      size: 0.3,
+      size: 0.15,
       transparent: true,
-      opacity: 1.0,
+      opacity: 0.8,
       depthTest: true,
-      depthWrite: false,
-      sizeAttenuation: true
+      depthWrite: false
     });
     
+    // Create floating particles that respect diorama boundaries
+    this.starParticles = [];
     const starsVertices = [];
-    const starsOpacities = [];
     
-    for (let i = 0; i < 3000; i++) {
-      const x = (Math.random() - 0.5) * 100;
-      const y = (Math.random() - 0.5) * 100;
-      // Move stars closer but still behind dioramas
-      const z = -8 - (Math.random() * 25); // Range: -8 to -33 (closer to viewer)
-      starsVertices.push(x, y, z);
+    for (let i = 0; i < 2000; i++) {
+      const x = (Math.random() - 0.5) * 150;
+      const y = (Math.random() - 0.5) * 150;
+      const z = (Math.random() - 0.5) * 150;
       
-      // Add random opacity for twinkling
-      starsOpacities.push(0.3 + Math.random() * 0.7);
+      // Store particle data for physics simulation
+      this.starParticles.push({
+        position: new THREE.Vector3(x, y, z),
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.02,
+          (Math.random() - 0.5) * 0.02,
+          (Math.random() - 0.5) * 0.02
+        ),
+        originalPosition: new THREE.Vector3(x, y, z)
+      });
+      
+      starsVertices.push(x, y, z);
     }
     
     starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starsVertices, 3));
-    starsGeometry.setAttribute('opacity', new THREE.Float32BufferAttribute(starsOpacities, 1));
-    
     this.stars = new THREE.Points(starsGeometry, starsMaterial);
-    this.stars.renderOrder = -1;
     this.scene.add(this.stars);
     
-    // Store twinkling data
-    this.starsTwinkle = {
-      time: 0,
-      speeds: []
-    };
-    
-    // Generate random twinkling speeds for each star
-    for (let i = 0; i < 3000; i++) {
-      this.starsTwinkle.speeds.push(0.5 + Math.random() * 2.0);
-    }
-    
-    // Add some colored stars with different sizes
+    // Add colored stars with physics
     const coloredStarsGeometry = new THREE.BufferGeometry();
     const coloredStarsVertices = [];
-    const coloredStarsOpacities = [];
+    this.coloredStarParticles = [];
     
-    for (let i = 0; i < 500; i++) {
-      const x = (Math.random() - 0.5) * 100;
-      const y = (Math.random() - 0.5) * 100;
-      const z = -10 - (Math.random() * 30); // Range: -10 to -40
+    for (let i = 0; i < 300; i++) {
+      const x = (Math.random() - 0.5) * 150;
+      const y = (Math.random() - 0.5) * 150;
+      const z = (Math.random() - 0.5) * 150;
+      
+      this.coloredStarParticles.push({
+        position: new THREE.Vector3(x, y, z),
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.015,
+          (Math.random() - 0.5) * 0.015,
+          (Math.random() - 0.5) * 0.015
+        ),
+        originalPosition: new THREE.Vector3(x, y, z)
+      });
+      
       coloredStarsVertices.push(x, y, z);
-      coloredStarsOpacities.push(0.4 + Math.random() * 0.6);
     }
     
     coloredStarsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(coloredStarsVertices, 3));
-    coloredStarsGeometry.setAttribute('opacity', new THREE.Float32BufferAttribute(coloredStarsOpacities, 1));
     
-    // Create multiple colored star systems with varying sizes
+    // Create colored star systems with original colors
     const coloredStarMaterials = [
-      new THREE.PointsMaterial({ 
-        color: 0x87ceeb, // Sky blue
-        size: 0.4, 
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        sizeAttenuation: true
-      }),
-      new THREE.PointsMaterial({ 
-        color: 0xffd700, // Gold
-        size: 0.5, 
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        sizeAttenuation: true
-      }),
-      new THREE.PointsMaterial({ 
-        color: 0xffffff, // Bright white
-        size: 0.6, 
-        transparent: true,
-        depthTest: true,
-        depthWrite: false,
-        sizeAttenuation: true
-      })
+      new THREE.PointsMaterial({ color: 0x4a90e2, size: 0.2, transparent: true }),
+      new THREE.PointsMaterial({ color: 0xff9966, size: 0.25, transparent: true }),
+      new THREE.PointsMaterial({ color: 0x66ffcc, size: 0.2, transparent: true })
     ];
     
     this.coloredStars = [];
-    this.coloredStarsTwinkle = [];
-    
-    coloredStarMaterials.forEach((material, index) => {
+    coloredStarMaterials.forEach(material => {
       const coloredStars = new THREE.Points(coloredStarsGeometry.clone(), material);
-      coloredStars.renderOrder = -1;
       this.scene.add(coloredStars);
       this.coloredStars.push(coloredStars);
-      
-      // Store twinkling data for colored stars
-      const twinkleData = {
-        time: Math.random() * Math.PI * 2,
-        speeds: []
-      };
-      
-      for (let i = 0; i < 500; i++) {
-        twinkleData.speeds.push(0.3 + Math.random() * 1.5);
-      }
-      
-      this.coloredStarsTwinkle.push(twinkleData);
       
       // Add some random rotation
       coloredStars.rotation.x = Math.random() * Math.PI;
       coloredStars.rotation.y = Math.random() * Math.PI;
     });
+    
+    // Create bounding boxes for dioramas for collision detection
+    this.dioramaBounds = [];
   }
 
   // Add method to create edit mode toggle button
