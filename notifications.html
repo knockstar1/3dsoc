@@ -302,6 +302,16 @@
       import * as THREE from 'three';
       import { Notifications } from './src/pages/Notifications.js';
       
+      // Check authentication first
+      const token = localStorage.getItem('token');
+      const currentUser = localStorage.getItem('currentUser');
+      
+      if (!token || !currentUser) {
+        console.log('Not authenticated, redirecting to home');
+        window.location.href = 'index.html';
+        throw new Error('Not authenticated');
+      }
+      
       // Create scene, camera and renderer
       const scene = new THREE.Scene();
       const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);

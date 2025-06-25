@@ -2,9 +2,6 @@ import * as THREE from 'three';
 import TWEEN from '@tweenjs/tween.js';
 import { Auth } from './pages/auth';
 import { Home } from './pages/Home';
-import { CharacterPage } from './pages/CharacterPage';
-import { Messages } from './pages/Messages';
-import { Notifications } from './pages/Notifications';
 
 class App {
   constructor() {
@@ -55,24 +52,14 @@ class App {
       });
     }
     
-    // Determine current page based on URL
+    // Only handle index.html - other pages handle themselves
     const currentPath = window.location.pathname;
-    if (currentPath.includes('notifications.html')) {
-      if (token && currentUser) {
-        this.notifications = new Notifications(this.scene, this.camera, this.renderer);
-        this.currentPage = 'notifications';
-        this.notifications.show();
-      } else {
-        this.auth.show();
-      }
-    } else if (currentPath.includes('character.html')) {
-      if (token && currentUser) {
-        this.characterPage = new CharacterPage(this.scene, this.camera, this.renderer);
-        this.currentPage = 'character';
-        this.characterPage.show();
-      } else {
-        this.auth.show();
-      }
+    if (currentPath.includes('notifications.html') || 
+        currentPath.includes('character.html') || 
+        currentPath.includes('messages.html')) {
+      // These pages handle themselves with their own scripts
+      // Don't initialize main app for these pages
+      return;
     } else if (token && currentUser) {
       console.log('User found, initializing home page');
       this.home = new Home(this.scene, this.camera, this.renderer);
@@ -87,7 +74,7 @@ class App {
     // Setup event listeners
     window.addEventListener('resize', this.onWindowResize.bind(this));
     
-    // Handle navigation events
+    // Handle navigation events (only for index.html page switching)
     window.addEventListener('navigate', (event) => {
       const newPage = event.detail.page;
       console.log('Navigating to:', newPage);
@@ -97,11 +84,9 @@ class App {
         this.home?.hide();
       } else if (this.currentPage === 'auth') {
         this.auth?.hide();
-      } else if (this.currentPage === 'notifications') {
-        this.notifications?.hide();
       }
       
-      // Show new page
+      // Show new page (only handle home and auth on index.html)
       if (newPage === 'home') {
         if (!this.home) {
           console.log('Creating new home page instance');
@@ -110,11 +95,6 @@ class App {
         this.home.show();
       } else if (newPage === 'auth') {
         this.auth.show();
-      } else if (newPage === 'notifications') {
-        if (!this.notifications) {
-          this.notifications = new Notifications(this.scene, this.camera, this.renderer);
-        }
-        this.notifications.show();
       }
       
       this.currentPage = newPage;

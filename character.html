@@ -223,6 +223,16 @@
     import { CharacterCreator } from './src/pages/CharacterCreator.js';
     import { makeAuthenticatedRequest } from './src/utils/api.js';
 
+    // Check authentication first
+    const token = localStorage.getItem('token');
+    const currentUser = localStorage.getItem('currentUser');
+    
+    if (!token || !currentUser) {
+      console.log('Not authenticated, redirecting to home');
+      window.location.href = 'index.html';
+      throw new Error('Not authenticated');
+    }
+
     console.log('Starting character editor...');
 
     const scene = new THREE.Scene();
