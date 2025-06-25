@@ -74,7 +74,7 @@ mongoose.connect(MONGODB_URI, {
     process.exit(1); // Exit if can't connect to database
   });
 
-// Health check route
+// Health check route (before API routes)
 app.get('/health', (req, res) => {
   res.json({ status: 'OK', timestamp: new Date().toISOString() });
 });
@@ -93,6 +93,12 @@ try {
   process.exit(1);
 }
 
+// 404 handler for API routes (before static files)
+app.use('/api/*', (req, res) => {
+  console.log('API 404:', req.path);
+  res.status(404).json({ message: 'API endpoint not found' });
+});
+
 // Serve static files in production
 if (process.env.NODE_ENV === 'production') {
   const pathToDist = path.resolve(__dirname, '..', 'dist');
@@ -104,20 +110,41 @@ if (process.env.NODE_ENV === 'production') {
     etag: false
   }));
 
-  // Handle client-side routing - serve index.html for non-API routes
-  app.get('*', (req, res, next) => {
-    // Skip API routes
-    if (req.path.startsWith('/api/')) {
-      return next();
-    }
-    
-    try {
-      const indexPath = path.join(pathToDist, 'index.html');
-      console.log(`Serving index.html for: ${req.path}`);
-      res.sendFile(indexPath);
-    } catch (error) {
-      console.error('Error serving index.html:', error);
-      res.status(500).json({ message: 'Error serving application' });
+  // Handle specific frontend routes without using catch-all
+  const frontendRoutes = [
+    '/',
+    '/character.html',
+    '/messages.html', 
+    '/notifications.html'
+  ];
+  
+  frontendRoutes.forEach(route => {
+    app.get(route, (req, res) => {
+      try {
+        const indexPath = path.join(pathToDist, 'index.html');
+        console.log(`Serving index.html for route: ${route}`);
+        res.sendFile(indexPath);
+      } catch (error) {
+        console.error('Error serving index.html:', error);
+        res.status(500).json({ message: 'Error serving application' });
+      }
+    });
+  });
+  
+  // Handle any remaining frontend routes (without wildcards)
+  app.use((req, res, next) => {
+    // Only handle GET requests that don't start with /api
+    if (req.method === 'GET' && !req.path.startsWith('/api')) {
+      try {
+        const indexPath = path.join(pathToDist, 'index.html');
+        console.log(`Serving index.html for: ${req.path}`);
+        res.sendFile(indexPath);
+      } catch (error) {
+        console.error('Error serving index.html:', error);
+        res.status(500).json({ message: 'Error serving application' });
+      }
+    } else {
+      next();
     }
   });
 } else {
@@ -127,9 +154,10 @@ if (process.env.NODE_ENV === 'production') {
   });
 }
 
-// 404 handler for API routes
-app.use('/api/*', (req, res) => {
-  res.status(404).json({ message: 'API endpoint not found' });
+// Final 404 handler
+app.use((req, res) => {
+  console.log('Final 404:', req.path);
+  res.status(404).json({ message: 'Route not found' });
 });
 
 // Error handling middleware

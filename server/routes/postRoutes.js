@@ -20,9 +20,13 @@ router.get('/', getAllPosts);
 // Protected routes - require authentication
 router.use(auth);
 
+// IMPORTANT: Specific routes must come BEFORE parameterized routes
+// This route must come before /:id to avoid conflicts
+router.get('/user/:userId', getPostsByUser);
+
+// General post routes
 router.post('/', createPost);
 router.get('/:id', getPost);
-router.get('/user/:userId', getPostsByUser);
 router.put('/:id', updatePost);
 router.delete('/:id', deletePost);
 router.post('/:id/like', toggleLike);

@@ -16,12 +16,12 @@ const router = express.Router();
 router.post('/register', registerUser);
 router.post('/login', loginUser);
 
-// Protected routes
+// Protected routes - SPECIFIC routes must come BEFORE parameterized routes
 router.get('/verify', auth, verifyToken);
 router.get('/character', auth, getCharacter);
 router.put('/character', auth, updateCharacter);
 
-// Get all users
+// Get all users (this should come before /:id to avoid conflicts)
 router.get('/', auth, async (req, res) => {
   try {
     const users = await User.find().select('-password');
@@ -32,6 +32,7 @@ router.get('/', auth, async (req, res) => {
   }
 });
 
+// Parameterized routes come LAST
 // Get user by ID
 router.get('/:id', auth, async (req, res) => {
   try {
