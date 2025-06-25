@@ -45,7 +45,7 @@ export class Messages {
 
   async loadUsers() {
     try {
-      const response = await makeAuthenticatedRequest('api/users');
+      const response = await makeAuthenticatedRequest('/api/users');
       const users = await response.json();
       
       if (Array.isArray(users)) {
@@ -109,7 +109,7 @@ export class Messages {
 
   async loadMessages(userId) {
     try {
-      const response = await makeAuthenticatedRequest(`api/messages/${userId}`);
+      const response = await makeAuthenticatedRequest(`/api/messages/${userId}`);
       const messages = await response.json();
       
       if (Array.isArray(messages)) {
@@ -180,7 +180,7 @@ export class Messages {
     
     try {
       const response = await makeAuthenticatedRequest(
-        'api/messages', 
+        '/api/messages', 
         'POST', 
         {
           recipient: this.currentChat._id,

@@ -31,6 +31,8 @@
       border: 2px solid lightgreen;
       width: 300px;
       box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+      display: block !important;
+      visibility: visible !important;
     }
     .character-controls {
       display: flex;
@@ -240,7 +242,26 @@
     const creator = new CharacterCreator(scene, camera);
     creator.isActive = true;
     document.addEventListener('wheel', creator.onWheel);
-
+    
+        // Make sure setupControls is called after DOM is ready
+    console.log('Setting up controls...');
+    creator.setupControls();
+    
+    // Add character to scene and show creator
+    console.log('Adding character to scene...');
+    scene.add(creator.character);
+    console.log('Showing character creator...');
+    creator.show();
+    
+    // Verify controls are working
+    setTimeout(() => {
+      console.log('Checking controls after 2 seconds...');
+      console.log('Arrow buttons found:', document.querySelectorAll('.arrow').length);
+      console.log('Color boxes found:', document.querySelectorAll('.color-box').length);
+      console.log('Character creator variations:', Object.keys(creator.variations));
+      console.log('Character creator active:', creator.isActive);
+    }, 2000);
+    
     // Load existing character data
     async function loadCharacter() {
       try {
@@ -300,60 +321,13 @@
     // Load character immediately
     loadCharacter();
 
-    // UI Handlers for arrow controls and color boxes
-    document.querySelectorAll('.arrow').forEach(btn => {
-      btn.addEventListener('click', (e) => {
-        const part = e.target.dataset.part;
-        const direction = e.target.classList.contains('left') ? -1 : 1;
-        
-        if (creator.variations[part]) {
-          const count = creator.variations[part].length;
-          const current = creator.currentVariations[part] || 0;
-          
-          // Calculate new index
-          let newIndex = (current + direction) % count;
-          if (newIndex < 0) newIndex = count - 1;
-          
-          // Store new index
-          creator.currentVariations[part] = newIndex;
-          console.log(`Cycling ${part} to variation ${newIndex}`);
-          
-          // Update character immediately
-          creator.updateCharacter();
-        }
-      });
-    });
-
-    // Color box controls
-    document.querySelectorAll('.color-box').forEach(box => {
-      box.addEventListener('click', (e) => {
-        const part = e.target.dataset.part;
-        
-        const colorSets = {
-          head: [0xffcc99, 0xe6b89c, 0xffe0bd, 0xd1a579, 0x8d5524],
-          teeth: [0xffffff, 0xfffafa, 0xf0f8ff, 0xf5f5f5],
-          shirt: [0x0000ff, 0xff0000, 0x00ff00, 0xffff00, 0xff00ff],
-          belt: [0x000000, 0x696969, 0x808080, 0xa9a9a9],
-          pants: [0x000080, 0x404040, 0x808080, 0x4169e1, 0x800000],
-          shoes: [0x222222, 0x3d3d3d, 0x595959, 0x666666]
-        };
-
-        const colors = colorSets[part];
-        const currentIndex = colors.indexOf(creator.colors[part]);
-        const nextIndex = (currentIndex + 1) % colors.length;
-        creator.colors[part] = colors[nextIndex];
-
-        // Update color box display
-        box.style.backgroundColor = '#' + creator.colors[part].toString(16).padStart(6, '0');
-        creator.updateCharacter();
-      });
-    });
-
     // Initialize color boxes
     function updateColorBoxes() {
       document.querySelectorAll('.color-box').forEach(box => {
         const part = box.dataset.part;
-        box.style.backgroundColor = '#' + creator.colors[part].toString(16).padStart(6, '0');
+        if (creator.colors && creator.colors[part] !== undefined) {
+          box.style.backgroundColor = '#' + creator.colors[part].toString(16).padStart(6, '0');
+        }
       });
     }
 
