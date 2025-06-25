@@ -21,21 +21,23 @@
       z-index: 0;
     }
     .character-creation {
-      position: fixed;
-      top: 20px;
-      left: 20px;
-      z-index: 5;
-      background: rgba(0, 0, 0, 0.8);
-      padding: 1rem;
-      border-radius: 8px;
-      border: 2px solid #4a90e2;
-      width: 250px;
-      max-height: 85vh;
-      overflow-y: auto;
-      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+      position: fixed !important;
+      top: 10px !important;
+      left: 10px !important;
+      z-index: 1000 !important;
+      background: rgba(0, 0, 0, 0.8) !important;
+      padding: 1rem !important;
+      border-radius: 8px !important;
+      border: 2px solid #4a90e2 !important;
+      width: 240px !important;
+      max-height: 85vh !important;
+      overflow-y: auto !important;
+      box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3) !important;
       display: block !important;
       visibility: visible !important;
-      backdrop-filter: blur(5px);
+      backdrop-filter: blur(5px) !important;
+      transform: none !important;
+      margin: 0 !important;
     }
     .character-controls {
       display: flex;
