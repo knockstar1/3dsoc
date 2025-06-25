@@ -10,8 +10,7 @@
     "server": "node server/server.js"
   },
   "devDependencies": {
-    "concurrently": "^9.1.2",
-    "vite": "^6.3.5"
+    "concurrently": "^9.1.2"
   },
   "dependencies": {
     "@tweenjs/tween.js": "^25.0.0",
@@ -21,6 +20,7 @@
     "jsonwebtoken": "^9.0.2",
     "mongoose": "^8.13.2",
     "three": "^0.174.0",
-    "dotenv": "^16.4.5"
+    "dotenv": "^16.4.5",
+    "vite": "^6.3.5"
   }
 }
