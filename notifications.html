@@ -289,6 +289,13 @@
     </style>
   </head>
   <body>
+    <nav class="menu" style="position: fixed; top: 20px; right: 20px; width: 120px; height: auto; background-color: rgba(0, 0, 0, 0.7); z-index: 1000; border-radius: 10px; padding: 10px;">
+      <a href="index.html" class="menu-item" style="display: block; color: #fff; text-decoration: none; margin: 5px 0; padding: 8px 12px; border-radius: 5px; transition: background-color 0.3s; text-align: center; font-size: 14px;" data-page="home">Home</a>
+      <a href="character.html" class="menu-item" style="display: block; color: #fff; text-decoration: none; margin: 5px 0; padding: 8px 12px; border-radius: 5px; transition: background-color 0.3s; text-align: center; font-size: 14px;" data-page="character">Character</a>
+      <a href="messages.html" class="menu-item" style="display: block; color: #fff; text-decoration: none; margin: 5px 0; padding: 8px 12px; border-radius: 5px; transition: background-color 0.3s; text-align: center; font-size: 14px;" data-page="messages">Messages</a>
+      <a href="notifications.html" class="menu-item active" style="display: block; color: #fff; text-decoration: none; margin: 5px 0; padding: 8px 12px; border-radius: 5px; transition: background-color 0.3s; text-align: center; font-size: 14px; background-color: rgba(255, 255, 255, 0.3); font-weight: bold;" data-page="notifications">Notifications</a>
+      <a href="#" class="menu-item logout-button" id="logout-button" style="display: block; color: #fff; text-decoration: none; margin: 5px 0; padding: 8px 12px; border-radius: 5px; transition: background-color 0.3s; text-align: center; font-size: 14px;">Logout</a>
+    </nav>
     <div id="app">
       <div class="notifications-container">
         <h1 class="notifications-title">Notifications</h1>
@@ -339,6 +346,20 @@
           window.location.href = '/';
         }
       });
+      
+      // Add logout functionality
+      const logoutButton = document.getElementById('logout-button');
+      if (logoutButton) {
+        logoutButton.addEventListener('click', (e) => {
+          e.preventDefault();
+          // Clear authentication data
+          localStorage.removeItem('token');
+          localStorage.removeItem('currentUser');
+          
+          // Redirect to home page
+          window.location.href = 'index.html';
+        });
+      }
     </script>
   </body>
 </html> 
