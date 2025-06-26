@@ -589,3 +589,45 @@ canvas {
   font-size: 18px;
   padding: 40px;
 }
+
+@media screen and (max-width: 768px) {
+  .menu {
+    width: 100%;
+    top: 0;
+    right: 0;
+    border-radius: 0;
+    display: flex;
+    justify-content: space-around;
+  }
+
+  .post-box {
+    width: calc(100% - 40px);
+    left: 20px;
+    bottom: 20px;
+  }
+
+  .part-controls {
+    flex-direction: row;
+    flex-wrap: wrap;
+    bottom: 80px;
+    top: auto;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 90%;
+    margin-right: 0;
+    justify-content: center;
+  }
+
+  .character-creation {
+    width: 90%;
+  }
+
+  .modal-content {
+    width: 90%;
+    padding: 20px;
+  }
+
+  .part-controls {
+    gap: 10px;
+  }
+}
