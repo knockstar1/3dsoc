@@ -231,6 +231,8 @@ export class Notifications {
         messageText = `${senderUsername} reacted to your post`;
       } else if (notification.type === 'comment') {
         messageText = `${senderUsername} commented on your post`;
+      } else if (notification.type === 'view') {
+        messageText = `${senderUsername} viewed your post`;
       } else {
         messageText = `${senderUsername} interacted with your post`;
       }

@@ -1363,15 +1363,15 @@ export class Home {
     
     // Calculate orbit position for this post
     const postsCount = userDiorama.mesh.userData.posts.length;
-    const orbitRadius = 2.5 + (postsCount * 0.3); // Each post orbits at slightly different radius
-    const orbitHeight = 1.0 + (Math.sin(postsCount * 0.7) * 0.5); // Vary height slightly
+    const orbitRadius = 4.0 + (postsCount * 0.4); // Increased base radius and spacing
+    const orbitHeight = -1.5 + (Math.sin(postsCount * 0.7) * 0.3); // Lowered height significantly
     
     // Position bubble group at orbit distance
     bubbleGroup.position.set(orbitRadius, orbitHeight, 0);
 
     // Create orbit group (rotation anchor)
     const orbitGroup = new THREE.Group();
-    orbitGroup.position.set(0, 0, -this.dioramaDepth / 2); // Center of diorama
+    orbitGroup.position.set(0, -1, -this.dioramaDepth / 2); // Center of diorama, lowered by 1 unit
     orbitGroup.add(bubbleGroup);
     
     // Add unique rotation speed and initial rotation
@@ -1903,6 +1903,9 @@ export class Home {
         this.reactionSound.currentTime = 0;
         this.reactionSound.play().catch(e => console.log('Error playing reaction sound:', e));
         
+        // Track the view
+        this.trackPostView(clickedPost.userData.postId);
+        
         clickedPost.userData.isClicked = true;
         this.createPostPopup(clickedPost);
       } else if (clickedObject.userData.isCharacter) {
@@ -1989,6 +1992,21 @@ export class Home {
       margin-bottom: 10px;
       font-style: italic;
     `;
+    
+    // Create view count element
+    const viewCountElement = document.createElement('div');
+    viewCountElement.classList.add('post-views');
+    viewCountElement.id = 'post-view-count';
+    viewCountElement.textContent = `Views: Loading...`;
+    viewCountElement.style.cssText = `
+      font-size: 12px;
+      color: #888;
+      margin-bottom: 10px;
+      font-style: italic;
+    `;
+    
+    // Load view count
+    this.loadPostViewCount(postId, viewCountElement);
     
     // Create reaction buttons
     const reactionBar = document.createElement('div');
@@ -2096,6 +2114,7 @@ export class Home {
     
     // Add elements to inner container
     innerContainer.appendChild(authorElement);
+    innerContainer.appendChild(viewCountElement);
     innerContainer.appendChild(popupContent);
     innerContainer.appendChild(reactionBar);
     
@@ -2680,6 +2699,47 @@ export class Home {
       this.handleReactionUpdate(updatedPost);
     } catch (error) {
       console.error('Error adding reaction:', error);
+    }
+  }
+
+  async trackPostView(postId) {
+    try {
+      const response = await makeAuthenticatedRequest(
+        `api/posts/${postId}/view`, 
+        'POST'
+      );
+
+      if (!response.ok) {
+        console.log('Failed to track view - may be post author or recent view');
+        return;
+      }
+
+      const result = await response.json();
+      console.log('View tracked successfully:', result);
+      
+      // Update view count in popup if it's open
+      const viewCountElement = document.getElementById('post-view-count');
+      if (viewCountElement && result.viewCount !== undefined) {
+        viewCountElement.textContent = `Views: ${result.viewCount}`;
+      }
+    } catch (error) {
+      console.error('Error tracking post view:', error);
+    }
+  }
+
+  async loadPostViewCount(postId, viewCountElement) {
+    try {
+      const response = await makeAuthenticatedRequest(`api/posts/${postId}`);
+      if (!response.ok) {
+        throw new Error('Failed to load post data');
+      }
+
+      const result = await response.json();
+      const viewCount = result.data?.viewCount || 0;
+      viewCountElement.textContent = `Views: ${viewCount}`;
+    } catch (error) {
+      console.error('Error loading view count:', error);
+      viewCountElement.textContent = 'Views: --';
     }
   }
 

@@ -393,4 +393,89 @@ export const addReaction = async (req, res) => {
       error: error.message
     });
   }
+};
+
+// Track post view
+export const trackPostView = async (req, res) => {
+  try {
+    console.log('Tracking view for post:', req.params.id);
+    console.log('User ID:', req.user._id);
+
+    const post = await Post.findById(req.params.id)
+      .populate('author', '_id username');
+
+    if (!post) {
+      console.log('Post not found:', req.params.id);
+      return res.status(404).json({ message: 'Post not found' });
+    }
+
+    const userId = req.user._id;
+
+    // Don't track views from the post author
+    if (post.author && post.author._id.toString() === userId.toString()) {
+      console.log('Skipping view tracking for post author');
+      return res.status(200).json({ 
+        success: true,
+        message: 'View not tracked for post author',
+        viewCount: post.viewCount || 0
+      });
+    }
+
+    // Initialize views array if it doesn't exist
+    if (!post.views) {
+      post.views = [];
+    }
+
+    // Check if user already viewed this post recently (within last hour)
+    const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+    const existingView = post.views.find(
+      v => v.user && v.user.toString() === userId.toString() && v.viewedAt > oneHourAgo
+    );
+
+    if (!existingView) {
+      console.log('Adding new view record');
+      // Add new view
+      post.views.push({
+        user: userId,
+        viewedAt: new Date()
+      });
+
+      // Update view count
+      post.viewCount = (post.viewCount || 0) + 1;
+
+      // Create notification for the post author (only for first few views to avoid spam)
+      if (post.author && post.viewCount <= 5) {
+        console.log('Creating view notification for post author:', post.author._id);
+        try {
+          await Notification.create({
+            recipient: post.author._id,
+            sender: userId,
+            type: 'view',
+            post: post._id
+          });
+          console.log('View notification created successfully');
+        } catch (notificationError) {
+          console.error('Error creating view notification:', notificationError);
+          // Don't fail the whole request if notification creation fails
+        }
+      }
+
+      await post.save();
+      console.log('Post view tracked successfully, new count:', post.viewCount);
+    } else {
+      console.log('View already tracked recently, skipping');
+    }
+
+    res.status(200).json({
+      success: true,
+      viewCount: post.viewCount || 0,
+      message: 'View tracked successfully'
+    });
+  } catch (error) {
+    console.error('Error tracking post view:', error);
+    res.status(500).json({ 
+      message: 'Error tracking post view',
+      error: error.message
+    });
+  }
 }; 

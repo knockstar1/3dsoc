@@ -9,7 +9,8 @@ import {
     toggleLike,
     addComment,
     getPostsByUser,
-    addReaction
+    addReaction,
+    trackPostView
 } from '../controllers/postController.js';
 
 const router = express.Router();
@@ -32,5 +33,6 @@ router.delete('/:id', deletePost);
 router.post('/:id/like', toggleLike);
 router.post('/:id/comment', addComment);
 router.post('/:id/react', addReaction);
+router.post('/:id/view', trackPostView);
 
 export default router; 
