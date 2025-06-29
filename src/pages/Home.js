@@ -1556,7 +1556,7 @@ export class Home {
       }
     }
 
-    // Handle existing cord system
+    // Handle existing cord system (only if diorama editing is NOT active)
     if (!this.dioramaEditing.isActive) {
       // ... existing cord system code ...
     }
@@ -3520,9 +3520,31 @@ export class Home {
     return material;
   }
 
-  // Apply glow effect to an object
+  // Apply glow effect to an object (only if it belongs to the current user)
   applyGlowEffect(object, effectType = 'selection') {
     if (!object) return;
+    
+    // Check if this object belongs to the current user's diorama
+    const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+    const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
+    
+    if (!userDiorama) {
+      console.warn('User diorama not found, cannot apply glow effect');
+      return;
+    }
+    
+    // Check if the object belongs to the user's diorama
+    let belongsToUser = false;
+    userDiorama.mesh.traverse(child => {
+      if (child === object) {
+        belongsToUser = true;
+      }
+    });
+    
+    if (!belongsToUser) {
+      console.warn('Cannot apply glow effect to object not owned by user');
+      return;
+    }
     
     // Store original material if not already stored
     if (!this.dioramaEditing.originalMaterials.has(object)) {
