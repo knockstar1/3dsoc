@@ -3,6 +3,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 import cors from 'cors';
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -116,8 +117,33 @@ async function startServer() {
 
   // Static file serving and frontend routes
   if (process.env.NODE_ENV === 'production') {
-    const pathToDist = path.resolve(__dirname, '..', 'dist');
+    // In production on Render, the dist folder is at the project root
+    let pathToDist = path.resolve(__dirname, '..', 'dist');
     console.log(`Setting up static files from: ${pathToDist}`);
+    
+    // Check if dist folder exists and log its contents
+    try {
+      if (fs.existsSync(pathToDist)) {
+        console.log('✓ Dist folder found');
+        const files = fs.readdirSync(pathToDist);
+        console.log('Dist folder contents:', files);
+      } else {
+        console.error('✗ Dist folder not found at:', pathToDist);
+        // Try alternative path
+        const altPath = path.resolve(__dirname, '..', '..', 'dist');
+        console.log('Trying alternative path:', altPath);
+        if (fs.existsSync(altPath)) {
+          console.log('✓ Found dist at alternative path');
+          pathToDist = altPath;
+        } else {
+          console.error('✗ Dist folder not found at alternative path either');
+          console.log('Current working directory:', process.cwd());
+          console.log('__dirname:', __dirname);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking dist folder:', error);
+    }
     
     try {
       // Serve static files
