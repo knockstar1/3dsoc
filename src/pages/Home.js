@@ -732,8 +732,8 @@ export class Home {
     const roomContainer = new THREE.Group();
     
     if (this.isModelLoaded && this.bedroomModel) {
-      // Clone the loaded model for this diorama
-      const roomClone = this.bedroomModel.clone();
+      // Clone the loaded model for this diorama with unique materials
+      const roomClone = this.deepCloneWithMaterials(this.bedroomModel);
       
       // Ensure furniture flags are preserved in the clone
       roomClone.traverse((child) => {
@@ -3198,10 +3198,19 @@ export class Home {
         this.dioramaEditing.hoveredObject = null;
       }
       
+      // Clear ALL glow effects from ALL objects in ALL dioramas
+      this.clearAllGlowEffects();
+      
       // Reset cursor
       document.body.style.cursor = 'default';
       
       this.dioramaEditing.selectedObject = null;
+      
+      // Remove variation selector if it exists
+      const variationControls = document.querySelector('.variation-controls');
+      if (variationControls) {
+        variationControls.remove();
+      }
     }
     
     // Show notification
@@ -3211,6 +3220,79 @@ export class Home {
       'Diorama editing mode disabled',
       'info'
     );
+  }
+
+  // Clear all glow effects from all objects
+  clearAllGlowEffects() {
+    this.visibleDioramas.forEach(diorama => {
+      diorama.mesh.traverse(child => {
+        if (child.userData && child.userData.glowObject) {
+          this.restoreObjectMaterial(child);
+        }
+      });
+    });
+    
+    // Clear the original materials map
+    this.dioramaEditing.originalMaterials.clear();
+  }
+
+  // Deep clone an object with unique materials for each diorama
+  deepCloneWithMaterials(object) {
+    const cloned = object.clone();
+    
+    cloned.traverse((child) => {
+      if (child.isMesh && child.material) {
+        // Clone the material to make it unique for this diorama
+        if (Array.isArray(child.material)) {
+          child.material = child.material.map(mat => mat.clone());
+        } else {
+          child.material = child.material.clone();
+        }
+      }
+    });
+    
+    return cloned;
+  }
+
+  // Save object color change to server
+  async saveObjectColor(object, colorValue) {
+    try {
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
+      
+      if (!userDiorama) {
+        console.error('User diorama not found for color save');
+        return;
+      }
+
+      const objectState = {
+        name: object.name || 'unnamed_object',
+        position: object.position.toArray(),
+        rotation: object.rotation.toArray(),
+        scale: object.scale.toArray(),
+        color: colorValue,
+        materialProperties: {
+          color: colorValue,
+          // Add other material properties as needed
+        }
+      };
+
+      const response = await makeAuthenticatedRequest(`api/users/${currentUser._id}/diorama-object`, 'PUT', { 
+        objectState 
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log('Object color saved:', result);
+
+      this.showNotification('Color saved successfully', 'success');
+    } catch (error) {
+      console.error('Error saving object color:', error);
+      this.showNotification('Failed to save color', 'error');
+    }
   }
 
   setupBackground() {
@@ -3405,7 +3487,33 @@ export class Home {
     
     // Add event listeners
     colorPicker.addEventListener('change', (e) => {
+      // Change color only if this object belongs to the current user
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
+      
+      if (!userDiorama) {
+        this.showNotification('Cannot find your diorama', 'warning');
+        return;
+      }
+      
+      // Check if the object belongs to the user's diorama
+      let belongsToUser = false;
+      userDiorama.mesh.traverse(child => {
+        if (child === object) {
+          belongsToUser = true;
+        }
+      });
+      
+      if (!belongsToUser) {
+        this.showNotification('You can only edit objects in your own diorama', 'warning');
+        return;
+      }
+      
+      // Apply the color change
       object.material.color.set(e.target.value);
+      
+      // Save the color change to the server
+      this.saveObjectColor(object, e.target.value);
     });
     
     prevButton.addEventListener('click', () => {
@@ -3523,6 +3631,11 @@ export class Home {
   // Apply glow effect to an object (only if it belongs to the current user)
   applyGlowEffect(object, effectType = 'selection') {
     if (!object) return;
+    
+    // Check if glow effect already exists - if so, remove it first to prevent accumulation
+    if (object.userData.glowObject) {
+      this.restoreObjectMaterial(object);
+    }
     
     // Check if this object belongs to the current user's diorama
     const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
