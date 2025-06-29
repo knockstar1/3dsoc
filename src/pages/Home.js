@@ -1438,16 +1438,28 @@ export class Home {
 
     // If we're in diorama editing mode
     if (this.dioramaEditing.isActive) {
+      // Get current user's diorama first
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
+      
+      if (!userDiorama) {
+        // No user diorama found, clear any hover effects
+        if (this.dioramaEditing.hoveredObject) {
+          this.restoreObjectMaterial(this.dioramaEditing.hoveredObject);
+          this.dioramaEditing.hoveredObject = null;
+          document.body.style.cursor = 'default';
+        }
+        return;
+      }
+
       // Only allow hover highlighting if no object is currently selected
       if (!this.dioramaEditing.selectedObject) {
-        // Get all furniture objects from visible dioramas
+        // Get furniture objects ONLY from the user's own diorama
         const furnitureObjects = [];
-        this.visibleDioramas.forEach(diorama => {
-          diorama.mesh.traverse(child => {
-            if (child.userData && child.userData.isFurniture) {
-              furnitureObjects.push(child);
-            }
-          });
+        userDiorama.mesh.traverse(child => {
+          if (child.userData && child.userData.isFurniture) {
+            furnitureObjects.push(child);
+          }
         });
 
         // Find intersections with furniture
@@ -1486,13 +1498,12 @@ export class Home {
         }
         
         // Check if we're hovering over the selected object for drag indication
+        // Only check furniture from user's own diorama
         const furnitureObjects = [];
-        this.visibleDioramas.forEach(diorama => {
-          diorama.mesh.traverse(child => {
-            if (child.userData && child.userData.isFurniture) {
-              furnitureObjects.push(child);
-            }
-          });
+        userDiorama.mesh.traverse(child => {
+          if (child.userData && child.userData.isFurniture) {
+            furnitureObjects.push(child);
+          }
         });
 
         const intersects = this.raycaster.intersectObjects(furnitureObjects, true);
@@ -1522,14 +1533,21 @@ export class Home {
     
     // If we're in diorama editing mode
     if (this.dioramaEditing.isActive) {
-      // Get all furniture objects from visible dioramas
+      // Get current user's diorama first
+      const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
+      const userDiorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
+      
+      if (!userDiorama) {
+        this.showNotification('Your diorama not found', 'warning');
+        return;
+      }
+
+      // Get furniture objects ONLY from the user's own diorama
       const furnitureObjects = [];
-      this.visibleDioramas.forEach(diorama => {
-        diorama.mesh.traverse(child => {
-          if (child.userData && child.userData.isFurniture) {
-            furnitureObjects.push(child);
-          }
-        });
+      userDiorama.mesh.traverse(child => {
+        if (child.userData && child.userData.isFurniture) {
+          furnitureObjects.push(child);
+        }
       });
 
       // Find intersections with furniture
@@ -1538,20 +1556,12 @@ export class Home {
       if (intersects.length > 0) {
         const object = intersects[0].object;
         
-        // Check if this is the user's diorama
-        const currentUser = JSON.parse(localStorage.getItem('currentUser') || '{}');
-        const diorama = this.visibleDioramas.find(d => d.mesh.userData.userId === currentUser._id);
+        // Since we're only checking user's own diorama, we can directly handle selection
+        this.handleObjectSelection(object);
         
-        if (diorama && object.parent === diorama.mesh) {
-          // Handle object selection
-          this.handleObjectSelection(object);
-          
-          // Start drag if object is already selected
-          if (this.dioramaEditing.selectedObject === object) {
-            this.startObjectDrag(event);
-          }
-        } else {
-          this.showNotification('You can only edit objects in your own diorama', 'warning');
+        // Start drag if object is already selected
+        if (this.dioramaEditing.selectedObject === object) {
+          this.startObjectDrag(event);
         }
       }
     }
