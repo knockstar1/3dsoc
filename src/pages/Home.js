@@ -920,6 +920,29 @@ export class Home {
       if (diorama.userData.mixer) {
         diorama.userData.mixer.update(0.016); // Assuming 60fps
       }
+      
+      // Update orbiting posts in each diorama
+      diorama.children.forEach(child => {
+        if (child.userData && child.userData.isOrbitingPost) {
+          // Rotate the orbit group to make posts orbit around diorama
+          const deltaTime = 0.016; // Assuming 60fps
+          child.rotation.y += child.userData.rotationSpeed * deltaTime;
+          
+          // Add subtle floating animation to bubble group
+          const bubbleGroup = child.children[0];
+          if (bubbleGroup) {
+            const time = Date.now() * 0.001;
+            bubbleGroup.position.y += Math.sin(time * 2 + child.userData.initialRotation) * 0.002;
+            
+            // Add gentle bobbing to the bubble itself
+            const bubble = bubbleGroup.children[0];
+            if (bubble) {
+              bubble.rotation.x = Math.sin(time * 1.5 + child.userData.initialRotation) * 0.1;
+              bubble.rotation.z = Math.cos(time * 1.2 + child.userData.initialRotation) * 0.05;
+            }
+          }
+        }
+      });
     });
     
     // Update all posts
@@ -1261,69 +1284,100 @@ export class Home {
       userDiorama.mesh.userData.posts = [];
     }
 
-    // Create canvas and context
+    // Create canvas for text with transparent background
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     canvas.width = 512;
     canvas.height = 256;
 
-    // Style the text panel
-    ctx.fillStyle = '#1a1a1a';
-    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    // Clear canvas with transparent background
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
     
-    ctx.strokeStyle = '#4a90e2';
-    ctx.lineWidth = 4;
-    ctx.strokeRect(2, 2, canvas.width - 4, canvas.height - 4);
-
-    // Style and add text
-    ctx.fillStyle = 'white';
-    ctx.font = '32px Roboto';
+    // Style and add text with semi-transparent background
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+    ctx.fillRect(10, 10, canvas.width - 20, canvas.height - 20);
     
-    // Word wrap
+    ctx.fillStyle = '#000000';
+    ctx.font = 'bold 28px Roboto';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    // Word wrap for bubble text
     const words = post.content.split(' ');
-    let line = '';
-    let y = 50;
-    const maxWidth = canvas.width - 40;
+    const lines = [];
+    let currentLine = '';
+    const maxWidth = canvas.width - 60;
     
     words.forEach(word => {
-      const testLine = line + word + ' ';
+      const testLine = currentLine + (currentLine ? ' ' : '') + word;
       const metrics = ctx.measureText(testLine);
-      if (metrics.width > maxWidth) {
-        ctx.fillText(line, 20, y);
-        line = word + ' ';
-        y += 40;
+      if (metrics.width > maxWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
       } else {
-        line = testLine;
+        currentLine = testLine;
       }
     });
-    ctx.fillText(line, 20, y);
+    if (currentLine) lines.push(currentLine);
+    
+    // Draw text lines centered
+    const lineHeight = 35;
+    const startY = canvas.height / 2 - ((lines.length - 1) * lineHeight) / 2;
+    lines.forEach((line, index) => {
+      ctx.fillText(line, canvas.width / 2, startY + (index * lineHeight));
+    });
 
-    // Create texture
     const texture = new THREE.CanvasTexture(canvas);
     texture.needsUpdate = true;
 
-    // Create post mesh
-    const geometry = new THREE.PlaneGeometry(1.5, 0.75);
-    const material = new THREE.MeshBasicMaterial({
-      map: texture,
-      transparent: true,
-      opacity: 0.9
-    });
-
-    const postMesh = new THREE.Mesh(geometry, material);
-    
-    // Calculate grid position
-    const postsCount = userDiorama.mesh.userData.posts.length;
-    const gridCols = 4;
-    const gridX = postsCount % gridCols;
-    const gridY = Math.floor(postsCount / gridCols);
-    
-    // Position on wall
-    postMesh.position.set(
-      -3 + (gridX * 1.7),
-      2 - (gridY * 0.95),
-      -this.dioramaDepth + 0.3
+    // Create text plane (inside bubble)
+    const textPlane = new THREE.Mesh(
+      new THREE.PlaneGeometry(1.4, 0.7),
+      new THREE.MeshBasicMaterial({ 
+        map: texture, 
+        transparent: true,
+        opacity: 0.95
+      })
     );
+    textPlane.position.set(0, 0, 0); // centered in bubble
+
+    // Create liquid glass bubble
+    const bubbleGeo = new THREE.SphereGeometry(0.8, 32, 32);
+    const bubbleMat = new THREE.MeshPhysicalMaterial({
+      transmission: 0.9,
+      transparent: true,
+      roughness: 0.05,
+      thickness: 0.2,
+      ior: 1.4,
+      clearcoat: 1,
+      clearcoatRoughness: 0.1,
+      color: new THREE.Color(0.8, 0.9, 1.0),
+      side: THREE.DoubleSide
+    });
+    const bubble = new THREE.Mesh(bubbleGeo, bubbleMat);
+
+    // Create bubble group (contains bubble + text)
+    const bubbleGroup = new THREE.Group();
+    bubbleGroup.add(bubble);
+    bubbleGroup.add(textPlane);
+    
+    // Calculate orbit position for this post
+    const postsCount = userDiorama.mesh.userData.posts.length;
+    const orbitRadius = 2.5 + (postsCount * 0.3); // Each post orbits at slightly different radius
+    const orbitHeight = 1.0 + (Math.sin(postsCount * 0.7) * 0.5); // Vary height slightly
+    
+    // Position bubble group at orbit distance
+    bubbleGroup.position.set(orbitRadius, orbitHeight, 0);
+
+    // Create orbit group (rotation anchor)
+    const orbitGroup = new THREE.Group();
+    orbitGroup.position.set(0, 0, -this.dioramaDepth / 2); // Center of diorama
+    orbitGroup.add(bubbleGroup);
+    
+    // Add unique rotation speed and initial rotation
+    orbitGroup.userData.rotationSpeed = 0.3 + (Math.random() * 0.4); // Random speed between 0.3-0.7
+    orbitGroup.userData.initialRotation = postsCount * (Math.PI * 2 / 5); // Spread posts around
+    orbitGroup.rotation.y = orbitGroup.userData.initialRotation;
     
     // Determine the post author - check if author is an object with _id property
     let authorId;
@@ -1369,21 +1423,22 @@ export class Home {
       }
     }
     
-    // Store post data
-    postMesh.userData.originalPosition = postMesh.position.clone();
-    postMesh.userData.originalScale = postMesh.scale.clone();
-    postMesh.userData.originalRotation = postMesh.rotation.clone();
-    postMesh.userData.content = post.content;
-    postMesh.userData.isPost = true;
-    postMesh.userData.postId = post._id;
-    postMesh.userData.authorId = authorId;
-    postMesh.userData.authorUsername = authorUsername;
-    postMesh.userData.createdAt = post.createdAt; // Store the creation date
-    postMesh.userData.reactions = post.reactions || [];
+    // Store post data in orbit group
+    orbitGroup.userData.originalPosition = orbitGroup.position.clone();
+    orbitGroup.userData.originalScale = orbitGroup.scale.clone();
+    orbitGroup.userData.originalRotation = orbitGroup.rotation.clone();
+    orbitGroup.userData.content = post.content;
+    orbitGroup.userData.isPost = true;
+    orbitGroup.userData.postId = post._id;
+    orbitGroup.userData.authorId = authorId;
+    orbitGroup.userData.authorUsername = authorUsername;
+    orbitGroup.userData.createdAt = post.createdAt;
+    orbitGroup.userData.reactions = post.reactions || [];
+    orbitGroup.userData.isOrbitingPost = true; // Mark as orbiting post for animation
 
     // Store post data in diorama
     userDiorama.mesh.userData.posts.push({
-      mesh: postMesh,
+      mesh: orbitGroup, // Store the orbit group instead of individual mesh
       content: post.content,
       timestamp: post.createdAt,
       postId: post._id,
@@ -1392,10 +1447,10 @@ export class Home {
       reactions: post.reactions || []
     });
     
-    console.log(`Added post to diorama for ${authorUsername || 'Unknown User'}, total posts: ${userDiorama.mesh.userData.posts.length}`);
+    console.log(`Added orbiting bubble post to diorama for ${authorUsername || 'Unknown User'}, total posts: ${userDiorama.mesh.userData.posts.length}`);
     
-    // Add to scene
-    userDiorama.mesh.add(postMesh);
+    // Add orbit group to diorama
+    userDiorama.mesh.add(orbitGroup);
   }
 
   setupEventListeners() {
