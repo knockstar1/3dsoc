@@ -63,22 +63,9 @@ export class Home {
       selectedObject: null,
       originalMaterials: new Map(),
       variations: new Map(), // Add variations Map
-      highlightMaterial: new THREE.MeshPhysicalMaterial({
-        color: 0x4a90e2,
-        transparent: true,
-        opacity: 0.8,
-        metalness: 0.5,
-        roughness: 0.2,
-        envMapIntensity: 1.0
-      }),
-      hoverMaterial: new THREE.MeshPhysicalMaterial({
-        color: 0xff8c00,
-        transparent: true,
-        opacity: 0.6,
-        metalness: 0.3,
-        roughness: 0.4,
-        envMapIntensity: 0.8
-      }),
+      // Remove the old transparent materials and add new glowing materials
+      selectionMaterial: this.createGlowMaterial(0x4a90e2, 1.0), // Blue glow for selection
+      hoverMaterial: this.createGlowMaterial(0xff8c00, 0.7), // Orange glow for hover
       isDragging: false,
       dragStartPosition: new THREE.Vector3(),
       dragPlane: new THREE.Plane(new THREE.Vector3(0, 0, 1), 0),
@@ -1451,42 +1438,67 @@ export class Home {
 
     // If we're in diorama editing mode
     if (this.dioramaEditing.isActive) {
-      // Get all furniture objects from visible dioramas
-      const furnitureObjects = [];
-      this.visibleDioramas.forEach(diorama => {
-        diorama.mesh.traverse(child => {
-          if (child.userData && child.userData.isFurniture) {
-            furnitureObjects.push(child);
-          }
+      // Only allow hover highlighting if no object is currently selected
+      if (!this.dioramaEditing.selectedObject) {
+        // Get all furniture objects from visible dioramas
+        const furnitureObjects = [];
+        this.visibleDioramas.forEach(diorama => {
+          diorama.mesh.traverse(child => {
+            if (child.userData && child.userData.isFurniture) {
+              furnitureObjects.push(child);
+            }
+          });
         });
-      });
 
-      // Find intersections with furniture
-      const intersects = this.raycaster.intersectObjects(furnitureObjects, true);
+        // Find intersections with furniture
+        const intersects = this.raycaster.intersectObjects(furnitureObjects, true);
 
-      if (intersects.length > 0) {
-        const object = intersects[0].object;
-        
-        // If we're not already hovering this object
-        if (this.dioramaEditing.hoveredObject !== object) {
-          // Clear previous hover
-          if (this.dioramaEditing.hoveredObject) {
-            this.dioramaEditing.hoveredObject.material = this.dioramaEditing.originalMaterials.get(this.dioramaEditing.hoveredObject);
+        if (intersects.length > 0) {
+          const object = intersects[0].object;
+          
+          // If we're not already hovering this object
+          if (this.dioramaEditing.hoveredObject !== object) {
+            // Clear previous hover
+            if (this.dioramaEditing.hoveredObject) {
+              this.restoreObjectMaterial(this.dioramaEditing.hoveredObject);
+            }
+            
+            // Set new hover
+            this.dioramaEditing.hoveredObject = object;
+            this.applyGlowEffect(object, 'hover');
+            
+            // Change cursor
+            document.body.style.cursor = 'pointer';
           }
-          
-          // Set new hover
-          this.dioramaEditing.hoveredObject = object;
-          this.dioramaEditing.originalMaterials.set(object, object.material);
-          object.material = this.dioramaEditing.hoverMaterial.clone();
-          
-          // Change cursor
-          document.body.style.cursor = 'pointer';
+        } else {
+          // Clear hover if mouse is not over any furniture
+          if (this.dioramaEditing.hoveredObject) {
+            this.restoreObjectMaterial(this.dioramaEditing.hoveredObject);
+            this.dioramaEditing.hoveredObject = null;
+            document.body.style.cursor = 'default';
+          }
         }
       } else {
-        // Clear hover if mouse is not over any furniture
+        // If an object is selected, clear any hover state and show appropriate cursor
         if (this.dioramaEditing.hoveredObject) {
-          this.dioramaEditing.hoveredObject.material = this.dioramaEditing.originalMaterials.get(this.dioramaEditing.hoveredObject);
+          this.restoreObjectMaterial(this.dioramaEditing.hoveredObject);
           this.dioramaEditing.hoveredObject = null;
+        }
+        
+        // Check if we're hovering over the selected object for drag indication
+        const furnitureObjects = [];
+        this.visibleDioramas.forEach(diorama => {
+          diorama.mesh.traverse(child => {
+            if (child.userData && child.userData.isFurniture) {
+              furnitureObjects.push(child);
+            }
+          });
+        });
+
+        const intersects = this.raycaster.intersectObjects(furnitureObjects, true);
+        if (intersects.length > 0 && intersects[0].object === this.dioramaEditing.selectedObject) {
+          document.body.style.cursor = 'grab';
+        } else {
           document.body.style.cursor = 'default';
         }
       }
@@ -2457,6 +2469,9 @@ export class Home {
     // Update posts
     this.update();
     
+    // Update glow shader uniforms for time-based effects
+    this.updateGlowEffects();
+    
     // Render the scene
     this.renderer.render(this.scene, this.camera);
     
@@ -2464,6 +2479,33 @@ export class Home {
     if (this.activeConfetti && this.activeConfetti.length > 0) {
       this.updateConfetti();
     }
+  }
+
+  // Update glow shader time uniforms for animation
+  updateGlowEffects() {
+    const time = Date.now() * 0.001; // Convert to seconds
+    
+    // Update selection material
+    if (this.dioramaEditing.selectionMaterial && this.dioramaEditing.selectionMaterial.uniforms) {
+      this.dioramaEditing.selectionMaterial.uniforms.time.value = time;
+    }
+    
+    // Update hover material
+    if (this.dioramaEditing.hoverMaterial && this.dioramaEditing.hoverMaterial.uniforms) {
+      this.dioramaEditing.hoverMaterial.uniforms.time.value = time;
+    }
+    
+    // Update all active glow objects
+    this.visibleDioramas.forEach(diorama => {
+      diorama.mesh.traverse(child => {
+        if (child.userData && child.userData.glowObject) {
+          const glowMaterial = child.userData.glowObject.material;
+          if (glowMaterial && glowMaterial.uniforms && glowMaterial.uniforms.time) {
+            glowMaterial.uniforms.time.value = time;
+          }
+        }
+      });
+    });
   }
 
   dispose() {
@@ -2952,19 +2994,16 @@ export class Home {
     this.showVariationSelector(object);
   }
 
-  // Add method to highlight object
+  // Add method to highlight object with glow effect
   highlightObject(object) {
     if (!object) return;
     
-    // Store original materials
-    this.dioramaEditing.originalMaterials.set(object, object.material);
+    // Apply glow effect for selection
+    this.applyGlowEffect(object, 'selection');
     
-    // Apply highlight material
-    object.material = this.dioramaEditing.highlightMaterial.clone();
-    
-    // Add subtle animation
+    // Add subtle scale animation
     const originalScale = object.scale.clone();
-    const targetScale = originalScale.multiplyScalar(1.05);
+    const targetScale = originalScale.multiplyScalar(1.02);
     
     // Animate scale
     const duration = 0.3;
@@ -2994,14 +3033,32 @@ export class Home {
     
     const object = this.dioramaEditing.selectedObject;
     
-    // Restore original material
-    if (this.dioramaEditing.originalMaterials.has(object)) {
-      object.material = this.dioramaEditing.originalMaterials.get(object);
-      this.dioramaEditing.originalMaterials.delete(object);
-    }
+    // Restore original material and remove glow
+    this.restoreObjectMaterial(object);
     
-    // Reset scale
-    object.scale.set(1, 1, 1);
+    // Reset scale smoothly
+    const currentScale = object.scale.clone();
+    const targetScale = new THREE.Vector3(1, 1, 1);
+    
+    const duration = 0.2;
+    const startTime = Date.now();
+    
+    const animate = () => {
+      const elapsed = (Date.now() - startTime) / 1000;
+      const progress = Math.min(elapsed / duration, 1);
+      
+      // Use easing function
+      const easeProgress = 1 - Math.pow(1 - progress, 3); // Cubic ease out
+      
+      // Interpolate scale
+      object.scale.lerpVectors(currentScale, targetScale, easeProgress);
+      
+      if (progress < 1) {
+        requestAnimationFrame(animate);
+      }
+    };
+    
+    animate();
     
     // Clear selection
     this.dioramaEditing.selectedObject = null;
@@ -3131,9 +3188,19 @@ export class Home {
   toggleDioramaEditing() {
     this.dioramaEditing.isActive = !this.dioramaEditing.isActive;
     
-    // Clear any existing selection
+    // Clear any existing selection and hover effects when exiting edit mode
     if (!this.dioramaEditing.isActive) {
       this.clearObjectHighlight();
+      
+      // Clear hover effect if any
+      if (this.dioramaEditing.hoveredObject) {
+        this.restoreObjectMaterial(this.dioramaEditing.hoveredObject);
+        this.dioramaEditing.hoveredObject = null;
+      }
+      
+      // Reset cursor
+      document.body.style.cursor = 'default';
+      
       this.dioramaEditing.selectedObject = null;
     }
     
@@ -3399,6 +3466,103 @@ export class Home {
         object.material.dispose();
         object.material = variation.material.clone();
       }
+    }
+  }
+
+    // Create a glowing material using shaders for better visual effect
+  createGlowMaterial(color, intensity = 1.0) {
+    const material = new THREE.ShaderMaterial({
+      uniforms: {
+        time: { value: 0 },
+        glowColor: { value: new THREE.Color(color) },
+        intensity: { value: intensity },
+        opacity: { value: 0.8 }
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        
+        void main() {
+          vNormal = normalize(normalMatrix * normal);
+          vPosition = position;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        uniform float time;
+        uniform vec3 glowColor;
+        uniform float intensity;
+        uniform float opacity;
+        
+        varying vec3 vNormal;
+        varying vec3 vPosition;
+        
+        void main() {
+          // Create a pulsing glow effect
+          float pulse = sin(time * 3.0) * 0.1 + 0.9;
+          
+          // Fresnel effect for rim lighting
+          vec3 viewVector = normalize(cameraPosition - vPosition);
+          float fresnel = pow(1.0 - dot(vNormal, viewVector), 2.0);
+          
+          // Combine pulse and fresnel for glow
+          float glow = fresnel * pulse * intensity;
+          
+          gl_FragColor = vec4(glowColor, glow * opacity);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      depthWrite: false
+    });
+    
+    return material;
+  }
+
+  // Apply glow effect to an object
+  applyGlowEffect(object, effectType = 'selection') {
+    if (!object) return;
+    
+    // Store original material if not already stored
+    if (!this.dioramaEditing.originalMaterials.has(object)) {
+      this.dioramaEditing.originalMaterials.set(object, object.material);
+    }
+    
+    // Create a clone of the object for the glow effect
+    const glowObject = object.clone();
+    glowObject.material = effectType === 'selection' ? 
+      this.dioramaEditing.selectionMaterial.clone() : 
+      this.dioramaEditing.hoverMaterial.clone();
+    
+    // Scale the glow object slightly larger
+    glowObject.scale.multiplyScalar(1.02);
+    
+    // Add glow object as child to the original object
+    object.add(glowObject);
+    object.userData.glowObject = glowObject;
+    
+    // Store the effect type for updating
+    object.userData.glowEffectType = effectType;
+  }
+
+  // Restore object to original material and remove glow
+  restoreObjectMaterial(object) {
+    if (!object) return;
+    
+    // Remove glow object if it exists
+    if (object.userData.glowObject) {
+      object.remove(object.userData.glowObject);
+      object.userData.glowObject.geometry?.dispose();
+      object.userData.glowObject.material?.dispose();
+      delete object.userData.glowObject;
+      delete object.userData.glowEffectType;
+    }
+    
+    // Restore original material if stored
+    if (this.dioramaEditing.originalMaterials.has(object)) {
+      object.material = this.dioramaEditing.originalMaterials.get(object);
+      this.dioramaEditing.originalMaterials.delete(object);
     }
   }
 }
